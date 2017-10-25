@@ -40,8 +40,8 @@ class DRR(Cusp):
         return (2*jp/abs(self.d_nu_p(ap, jp))/n_p *
                 A2_integrand(a, j, ap, jp, l, n, n_p, true_anomaly))
 
-    def drr(self, l_sphr, n, n_p, neval=1e3):
-        key = '{},{},{}'.format(l, n, n_p)
+    def drr(self, l_sphr, n, n_p, neval=1e4):
+        key = '{},{},{}'.format(l_sphr, n, n_p)
         try:
             return self._drr_dict[key]
         except AttributeError:
@@ -52,7 +52,7 @@ class DRR(Cusp):
 
         bar = progressbar.ProgressBar()
         for ji, omegai, i in zip(self.j, self.omega, bar(range(self.j.size))):
-            self._drr_dict[key][i, :] = self._drr(self.at, ji, omegai,
+            self._drr_dict[key][i, :] = self._drr(self.a, ji, omegai,
                                                   l_sphr, n, n_p, neval=neval)
 
         return self._drr_dict[key]
@@ -72,8 +72,8 @@ class DRR(Cusp):
             ix2 = jf2 > 0
             x[ix1] = self._integrand(a, j, af[ix1], jf1[ix1], l, n, n_p,
                                      true_anomaly[:, ix1])
-            x[ix2] += self._integrand(a, j, af[ix2], jf2[ix2], l, n, n_p,
-                                      true_anomaly[:, ix2])
+            x[ix2] = self._integrand(a, j, af[ix2], jf2[ix2], l, n, n_p,
+                                     true_anomaly[:, ix2])
             return x
         return (np.array(integrate(C, integ, neval)) *
                 self._A2_norm_factor(l, n, n_p)*n**2)
@@ -111,9 +111,9 @@ def A2_integrand(a, j, ap, jp, l, n, n_p, true_anomaly):
     ecc, eccp = np.sqrt(1-j**2), np.sqrt(1-jp**2)
     r1, r2 = (a*(1-ecc**2)/(1-ecc*np.cos(true_anomaly[:2])))
     rp1, rp2 = (ap*(1-eccp**2)/(1-eccp*np.cos(true_anomaly[2:])))
-    return (1/j/jp*c/j**2/jp**2/a**2/ap**4 *
-            (np.minimum(r1, rp1)*np.minimum(r2, rp2))**(2*l+1) /
-            (r1*r2*rp1*rp2)**(l-1))
+    return 16*(c/j**2/jp**2/a**2/ap**4 *
+               (np.minimum(r1, rp1)*np.minimum(r2, rp2))**(2*l+1) /
+               (r1*r2*rp1*rp2)**(l-1))
 
 
 def _A2_norm_factor(l, n, n_p):

@@ -1,8 +1,8 @@
 """Properties of the stellar cusp"""
 import numpy as np
-from numpy import sqrt
-from numpy import pi
 from astropy import constants
+from numpy import pi
+from numpy import sqrt
 from scipy.special import eval_legendre
 
 G = constants.G
@@ -10,7 +10,6 @@ M0 = constants.M_sun
 C = constants.c
 RG0 = (G*M0/C**2).to('pc').value
 TG0 = (G*M0/C**3).to('year').value
-
 
 
 class Cusp(object):
@@ -31,6 +30,7 @@ class Cusp(object):
         Gravitational rads in pc
         """
         return RG0*self.mbh
+
     @property
     def tg(self, ):
         """
@@ -94,7 +94,8 @@ class Cusp(object):
 
     def _g(self, j):
         """
-        g(j) = -j^(6-2\gamma)/pi/sqrt(1-j^2)*\int_0^\pi cos(s)/(1+sqrt(1+j^2)^(3-\gamma)
+        g(j) = -j^(6-2\gamma)/pi/sqrt(1-j^2)*\int_0^\pi cos(s) /
+               (1+sqrt(1+j^2)^(3-\gamma)
         For \gamma = 2:
             g(j) = j/(1+j)
         For \gamma = 1:
@@ -152,15 +153,14 @@ class Cusp(object):
     def inverse_cumulative_a(self, r):
         return r**(1/(3-self.gamma))*self.rh
 
-
     @property
     def a_gr1(self):
         """
         The below which nup is only positive,
         that is nup(a,j=1) = 0
         """
-        return ((6/(3-self.gamma)*self.Q/self.Nh*self.rg/self.rh)
-                **(1/(4-self.gamma)) *
+        return ((6/(3-self.gamma)*self.Q/self.Nh*self.rg/self.rh) **
+                (1/(4-self.gamma)) *
                 self.rh)
 
     def jlc(self, a):

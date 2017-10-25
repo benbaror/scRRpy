@@ -9,21 +9,22 @@ class DRR(Cusp):
     """
     """
 
-    def __init__(self, at, l=1, gamma=1.75, mbh=4e6, mstar=1, rh=2):
+    def __init__(self, a, l_sphr=1, gamma=1.75, mbh=4e6, mstar=1, rh=2):
         """
 
         Arguments:
-        - `l`: multipole order
+        - `a`: semi-major axis
+        - `l_sphr`: multipole order
         - `gamma`: slope of the density profile
         - `mbh`: Black hole mass [solar mass]
         - `mstar`: mass of individual stars  [solar mass]
         - `rh`: radius of influence [pc]
         """
         super().__init__(gamma=gamma, mbh=mbh, mstar=mstar, rh=rh)
-        self.at = at
-        self.j = np.logspace(np.log10(self.jlc(at)), 0, 101)[:-1]
-        self.omega = abs(self.nu_p(self.at, self.j))
-        self.l = l
+        self.a = a
+        self.j = np.logspace(np.log10(self.jlc(self.a)), 0, 101)[:-1]
+        self.omega = abs(self.nu_p(self.a, self.j))
+        self.l_sphr = l_sphr
 
     def res_int(self, ratio):
         try:
@@ -35,12 +36,11 @@ class DRR(Cusp):
         self._res_int[ratio] = Res_interp(self, self.omega*ratio)
         return self._res_int[ratio]
 
-
     def _integrand(self, a, j, ap, jp, l, n, n_p, true_anomaly):
         return (2*jp/abs(self.d_nu_p(ap, jp))/n_p *
                 A2_integrand(a, j, ap, jp, l, n, n_p, true_anomaly))
 
-    def drr(self, l, n, n_p, neval=1e3):
+    def drr(self, l_sphr, n, n_p, neval=1e3):
         key = '{},{},{}'.format(l, n, n_p)
         try:
             return self._drr_dict[key]
@@ -53,7 +53,7 @@ class DRR(Cusp):
         bar = progressbar.ProgressBar()
         for ji, omegai, i in zip(self.j, self.omega, bar(range(self.j.size))):
             self._drr_dict[key][i, :] = self._drr(self.at, ji, omegai,
-                                               l, n, n_p, neval=neval)
+                                                  l_sphr, n, n_p, neval=neval)
 
         return self._drr_dict[key]
 
@@ -75,7 +75,8 @@ class DRR(Cusp):
             x[ix2] += self._integrand(a, j, af[ix2], jf2[ix2], l, n, n_p,
                                       true_anomaly[:, ix2])
             return x
-        return np.array(integrate(C, integ, neval))*self._A2_norm_factor(l, n, n_p)*n**2
+        return (np.array(integrate(C, integ, neval)) *
+                self._A2_norm_factor(l, n, n_p)*n**2)
 
     def _A2_norm_factor(self, l, n, n_p):
         """
@@ -91,7 +92,6 @@ class DRR(Cusp):
             pass
         self._A2_norm[key] = _A2_norm_factor(l, n, n_p)
         return self._A2_norm[key]
-
 
 
 def integrate(func, integ, neval):
@@ -114,8 +114,6 @@ def A2_integrand(a, j, ap, jp, l, n, n_p, true_anomaly):
     return (1/j/jp*c/j**2/jp**2/a**2/ap**4 *
             (np.minimum(r1, rp1)*np.minimum(r2, rp2))**(2*l+1) /
             (r1*r2*rp1*rp2)**(l-1))
-
-
 
 
 def _A2_norm_factor(l, n, n_p):

@@ -2,7 +2,6 @@
 import numpy as np
 from astropy import constants
 from numpy import pi
-from numpy import sqrt
 from scipy.special import eval_legendre
 
 G = constants.G
@@ -25,7 +24,7 @@ class Cusp(object):
         self.rh = rh
 
     @property
-    def rg(self, ):
+    def rg(self):
         """
         Gravitational rads in pc
         """

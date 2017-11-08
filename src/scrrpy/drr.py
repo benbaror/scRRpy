@@ -1,97 +1,96 @@
-from cusp import Cusp
+"""
+A module for calculating Resonant Relaxation diffusion coefficients
+"""
+
+from functools import lru_cache
+
 import numpy as np
-import vegas
 import progressbar
+import vegas
 from scipy import special
+
+from .cusp import Cusp
 
 
 class DRR(Cusp):
     """
+    Resonant relaxation diffusion coefficient
     """
 
-    def __init__(self, a, l_sphr=1, gamma=1.75, mbh=4e6, mstar=1, rh=2):
+    def __init__(self, sma, **kwargs):
         """
 
         Arguments:
-        - `a`: semi-major axis
+        - `sma`: semi-major axis [pc]
         - `l_sphr`: multipole order
         - `gamma`: slope of the density profile
         - `mbh`: Black hole mass [solar mass]
         - `mstar`: mass of individual stars  [solar mass]
         - `rh`: radius of influence [pc]
         """
-        super().__init__(gamma=gamma, mbh=mbh, mstar=mstar, rh=rh)
-        self.a = a
-        self.j = np.logspace(np.log10(self.jlc(self.a)), 0, 101)[:-1]
-        self.omega = abs(self.nu_p(self.a, self.j))
-        self.l_sphr = l_sphr
 
-    def res_int(self, ratio):
-        try:
-            return self._res_int[ratio]
-        except AttributeError:
-            self._res_int = {}
-        except KeyError:
-            pass
-        self._res_int[ratio] = Res_interp(self, self.omega*ratio)
-        return self._res_int[ratio]
+        # Default arguments
+        kwargs = {**dict(l_max=1,
+                         gamma=1.75,
+                         mbh=4e6,
+                         mstar=1,
+                         Njs=101,
+                         rh=2),
+                  **kwargs}
 
-    def _integrand(self, a, j, ap, jp, l, n, n_p, true_anomaly):
-        return (2*jp/abs(self.d_nu_p(ap, jp))/n_p *
-                A2_integrand(a, j, ap, jp, l, n, n_p, true_anomaly))
+        super().__init__(gamma=kwargs['gamma'],
+                         mbh=kwargs['mbh'],
+                         mstar=kwargs['mstar'],
+                         rh=kwargs['rh'])
 
-    def drr(self, l_sphr, n, n_p, neval=1e4):
-        key = '{},{},{}'.format(l_sphr, n, n_p)
-        try:
-            return self._drr_dict[key]
-        except AttributeError:
-            self._drr_dict = {}
-        except KeyError:
-            pass
-        self._drr_dict[key] = np.zeros([self.j.size, 2])
+        self.sma = sma
+        self.j = np.logspace(np.log10(self.jlc(self.sma)), 0,
+                             kwargs['Njs'])[:-1]
+        self.omega = abs(self.nu_p(self.sma, self.j))
+        self.l_max = kwargs['l_max']
 
-        bar = progressbar.ProgressBar()
-        for ji, omegai, i in zip(self.j, self.omega, bar(range(self.j.size))):
-            self._drr_dict[key][i, :] = self._drr(self.a, ji, omegai,
-                                                  l_sphr, n, n_p, neval=neval)
+    @lru_cache()
+    def _res_intrp(self, ratio):
+        return ResInterp(self, self.omega*ratio)
 
-        return self._drr_dict[key]
+    def _integrand(self, j, sma_p, j_p, lnnp, true_anomaly):
+        return (2*j_p/abs(self.d_nu_p(sma_p, j_p))/lnnp[-1] *
+                A2_integrand(self.sma, j, sma_p, j_p, lnnp, true_anomaly))
 
-    def _drr(self, a, j, omega, l, n, n_p, neval=1e3):
+    @lru_cache()
+    def drr(self, l, n, n_p, neval=1e3):
+        """
+        Calculates the l,n,n_p term of the diffusion coefficient
+        """
+
+        drr = np.zeros([self.j.size, 2])
+
+        pbar = progressbar.ProgressBar()
+        for j_i, omegai, i in zip(self.j, self.omega,
+                                  pbar(range(self.j.size))):
+            drr[i, :] = self._drr(j_i, omegai, [l, n, n_p], neval=neval)
+        return drr
+
+    def _drr(self, j, omega, lnnp, neval=1e3):
         integ = vegas.Integrator(5 * [[0, 1]])
-        ratio = n/n_p
+        ratio = lnnp[1]/lnnp[-1]
 
         @vegas.batchintegrand
-        def C(x):
+        def Clnnp(x):
             true_anomaly = x[:, :-1].T*np.pi
-            af = self.inverse_cumulative_a(x[:, -1])
-            jf1 = self.res_int(ratio).get_jf1(omega*ratio, af)
-            jf2 = self.res_int(ratio).get_jf2(omega*ratio, af)
-            x = np.zeros_like(af)
+            sma_f = self.inverse_cumulative_a(x[:, -1])
+            jf1 = self._res_intrp(ratio).get_jf1(omega*ratio, sma_f)
+            jf2 = self._res_intrp(ratio).get_jf2(omega*ratio, sma_f)
+            x = np.zeros_like(sma_f)
             ix1 = jf1 > 0
             ix2 = jf2 > 0
-            x[ix1] = self._integrand(a, j, af[ix1], jf1[ix1], l, n, n_p,
+            x[ix1] = self._integrand(j, sma_f[ix1], jf1[ix1], lnnp,
                                      true_anomaly[:, ix1])
-            x[ix2] = self._integrand(a, j, af[ix2], jf2[ix2], l, n, n_p,
+            x[ix2] = self._integrand(j, sma_f[ix2], jf2[ix2], lnnp,
                                      true_anomaly[:, ix2])
             return x
-        return (np.array(integrate(C, integ, neval)) *
-                self._A2_norm_factor(l, n, n_p)*n**2)
-
-    def _A2_norm_factor(self, l, n, n_p):
-        """
-        Normalization factor for |alnnp|^2
-        ! To be implemented
-        """
-        key = '{},{},{}'.format(l, n, n_p)
-        try:
-            return self._A2_norm[key]
-        except AttributeError:
-            self._A2_norm = {}
-        except KeyError:
-            pass
-        self._A2_norm[key] = _A2_norm_factor(l, n, n_p)
-        return self._A2_norm[key]
+        return (np.array(integrate(Clnnp, integ, neval)) *
+                _A2_norm_factor(*lnnp)*lnnp[1]**2)
 
 
 def integrate(func, integ, neval):
@@ -103,30 +102,33 @@ def integrate(func, integ, neval):
         return result.val, np.sqrt(result.var)
 
 
-def A2_integrand(a, j, ap, jp, l, n, n_p, true_anomaly):
+def A2_integrand(sma, j, sma_p, j_p, lnnp, true_anomaly):
     """
     returns the |alnnp|^2 integrand to use the the MC integration
     """
-    c = np.prod(np.cos(true_anomaly.T*np.array([n, n, n_p, n_p])), 1)
-    ecc, eccp = np.sqrt(1-j**2), np.sqrt(1-jp**2)
-    r1, r2 = (a*(1-ecc**2)/(1-ecc*np.cos(true_anomaly[:2])))
-    rp1, rp2 = (ap*(1-eccp**2)/(1-eccp*np.cos(true_anomaly[2:])))
-    return 16*(c/j**2/jp**2/a**2/ap**4 *
-               (np.minimum(r1, rp1)*np.minimum(r2, rp2))**(2*l+1) /
-               (r1*r2*rp1*rp2)**(l-1))
+    l, n, n_p = lnnp
+    cnnp = np.prod(np.cos(true_anomaly.T*np.array([n, n, n_p, n_p])), 1)
+    ecc, eccp = np.sqrt(1-j**2), np.sqrt(1-j_p**2)
+    r_1, r_2 = (sma*(1-ecc**2)/(1-ecc*np.cos(true_anomaly[:2])))
+    rp1, rp2 = (sma_p*(1-eccp**2)/(1-eccp*np.cos(true_anomaly[2:])))
+    return 16*(cnnp/j**2/j_p**2/sma**2/sma_p**4 *
+               (np.minimum(r_1, rp1)*np.minimum(r_2, rp2))**(2*l+1) /
+               (r_1*r_2*rp1*rp2)**(l-1))
 
 
+@lru_cache()
 def _A2_norm_factor(l, n, n_p):
     """
     Normalization factor for |alnnp|^2
     ! To be implemented
     """
+
     return (abs(special.sph_harm(n, l, 0, np.pi/2))**2 *
             abs(special.sph_harm(n_p, l, 0, np.pi/2))**2 *
             (4*np.pi/(2*l + 1)))**2
 
 
-class Res_interp(object):
+class ResInterp(object):
     """
     Interpolation function for the resonant condition
     """

@@ -111,9 +111,9 @@ def A2_integrand(sma, j, sma_p, j_p, lnnp, true_anomaly):
     ecc, eccp = np.sqrt(1-j**2), np.sqrt(1-j_p**2)
     r_1, r_2 = (sma*(1-ecc**2)/(1-ecc*np.cos(true_anomaly[:2])))
     rp1, rp2 = (sma_p*(1-eccp**2)/(1-eccp*np.cos(true_anomaly[2:])))
-    return 16*(cnnp/j**2/j_p**2/sma**2/sma_p**4 *
-               (np.minimum(r_1, rp1)*np.minimum(r_2, rp2))**(2*l+1) /
-               (r_1*r_2*rp1*rp2)**(l-1))
+    return (cnnp/j**2/j_p**2/sma**2/sma_p**4 *
+            (np.minimum(r_1, rp1)*np.minimum(r_2, rp2))**(2*l+1) /
+            (r_1*r_2*rp1*rp2)**(l-1))
 
 
 @lru_cache()
@@ -125,7 +125,7 @@ def _A2_norm_factor(l, n, n_p):
 
     return (abs(special.sph_harm(n, l, 0, np.pi/2))**2 *
             abs(special.sph_harm(n_p, l, 0, np.pi/2))**2 *
-            (4*np.pi/(2*l + 1)))**2
+            (4*np.pi/(2*l + 1))**2)/(2*l + 1)
 
 
 class ResInterp(object):

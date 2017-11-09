@@ -5,6 +5,8 @@ A module for calculating Resonant Relaxation diffusion coefficients
 from functools import lru_cache
 
 import numpy as np
+from numpy import mod
+from numpy import sqrt
 import progressbar
 import vegas
 from scipy import special
@@ -65,13 +67,62 @@ class DRR(Cusp):
 
         drr = np.zeros([self.j.size, 2])
 
-        pbar = progressbar.ProgressBar()
+        widgets = ['{}, {}, {}'.format(l, n, n_p), ' ',
+                   progressbar.Percentage(),
+                   ' (', progressbar.SimpleProgress(), ')', ' ',
+                   progressbar.Bar(), ' ',
+                   progressbar.Timer(), ' ',
+                   progressbar.AdaptiveETA()]
+
+        pbar = progressbar.ProgressBar(widgets=widgets)
+
         for j_i, omegai, i in zip(self.j, self.omega,
                                   pbar(range(self.j.size))):
             drr[i, :] = self._drr(j_i, omegai, [l, n, n_p], neval=neval)
         return drr
 
+    def tau2(self, l_max, neval=1e3):
+        tau2 = sum([self._tau2_lnnp(l, n, n_p, neval=neval)[0]
+                    for l in range(1, l_max + 1)
+                    for n in range(1, l+1)
+                    for n_p in range(0, l+1)
+                    if not mod(l+n, 2)+mod(l+n_p, 2)])
+
+        tau2_err = sqrt(sum([self._tau2_lnnp(l, n, n, neval=neval)[-1]**2
+                             for l in range(1, l_max + 1)
+                             for n in range(1, l+1)
+                             for n_p in range(0, l+1)
+                             if not mod(l+n, 2)+mod(l+n_p, 2)]))
+        return tau2, tau2_err
+
+    @lru_cache()
+    def _tau2_lnnp(self, l, n, n_p, neval=1e3):
+        """
+        Calculates the l,n,n_p term of the diffusion coefficient
+        """
+        tau2, tau2_err = np.zeros([2, self.j.size])
+
+        widgets = ['{}, {}, {}'.format(l, n, n_p), ' ',
+                   progressbar.Percentage(),
+                   ' (', progressbar.SimpleProgress(), ')', ' ',
+                   progressbar.Bar(), ' ',
+                   progressbar.Timer(), ' ',
+                   progressbar.AdaptiveETA()]
+
+        pbar = progressbar.ProgressBar(widgets=widgets)
+
+
+        for j_i, omegai, i in zip(self.j, self.omega,
+                                  pbar(range(self.j.size))):
+            tau2[i], tau2_err[i] = self._tau2(j_i, [l, n, n_p], neval=neval)
+        return tau2, tau2_err
+
     def _drr(self, j, omega, lnnp, neval=1e3):
+        if np.mod(l + n, 2) or np.mod(l + n_p, 2):
+            return 0, 0
+
+        tau2, tau2_err = np.zeros([2, self.j.size])
+
         integ = vegas.Integrator(5 * [[0, 1]])
         ratio = lnnp[1]/lnnp[-1]
 
@@ -89,8 +140,25 @@ class DRR(Cusp):
             x[ix2] = self._integrand(j, sma_f[ix2], jf2[ix2], lnnp,
                                      true_anomaly[:, ix2])
             return x
-        return (np.array(integrate(Clnnp, integ, neval)) *
-                _A2_norm_factor(*lnnp)*lnnp[1]**2)
+        return 2*(np.array(integrate(Clnnp, integ, neval)) *
+                  _A2_norm_factor(*lnnp)*lnnp[1]**2)
+
+    def _tau2(self, j, lnnp, neval=1e3):
+        if np.mod(lnnp[0] + lnnp[1], 2) or np.mod(lnnp[0] + lnnp[-1], 2):
+            return 0, 0
+
+        tau2, tau2_err = np.zeros([2, self.j.size])
+
+        integ = vegas.Integrator(6 * [[0, 1]])
+
+        @vegas.batchintegrand
+        def Clnnp(x):
+            true_anomaly = x[:, :-2].T*np.pi
+            sma_f = self.inverse_cumulative_a(x[:, -2])
+            j_f = sqrt(x[:, -1])
+            return A2_integrand(self.sma, j, sma_f, j_f, lnnp, true_anomaly)
+        return 4*(np.array(integrate(Clnnp, integ, neval)) *
+                  _A2_norm_factor(*lnnp)*lnnp[1]**2)
 
 
 def integrate(func, integ, neval):

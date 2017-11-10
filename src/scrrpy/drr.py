@@ -10,6 +10,7 @@ from numpy import sqrt
 import progressbar
 import vegas
 from scipy import special
+from numba import jit
 
 from .cusp import Cusp
 
@@ -57,15 +58,31 @@ class DRR(Cusp):
 
     def _integrand(self, j, sma_p, j_p, lnnp, true_anomaly):
         return (2*j_p/abs(self.d_nu_p(sma_p, j_p))/lnnp[-1] *
-                A2_integrand(self.sma, j, sma_p, j_p, lnnp, true_anomaly))
+                A2_integrand(self.sma, j, sma_p, j_p, lnnp[0], lnnp[1], lnnp[-1],
+                             true_anomaly))
+
+    def drr(self, l_max, neval=1e3):
+        drr = sum([self._drr_lnnp(l, n, n_p, neval=neval)[0]
+                   for l in range(1, l_max + 1)
+                   for n in range(1, l+1)
+                   for n_p in range(1, l+1)
+                   if not mod(l+n, 2)+mod(l+n_p, 2)])
+
+        drr_err = sqrt(sum([self._drr_lnnp(l, n, n, neval=neval)[-1]**2
+                            for l in range(1, l_max + 1)
+                            for n in range(1, l+1)
+                            for n_p in range(0, l+1)
+                            if not mod(l+n, 2)+mod(l+n_p, 2)]))
+        return drr, drr_err
+
 
     @lru_cache()
-    def drr(self, l, n, n_p, neval=1e3):
+    def _drr_lnnp(self, l, n, n_p, neval=1e3):
         """
         Calculates the l,n,n_p term of the diffusion coefficient
         """
 
-        drr = np.zeros([self.j.size, 2])
+        drr, drr_err = np.zeros([2, self.j.size])
 
         widgets = ['{}, {}, {}'.format(l, n, n_p), ' ',
                    progressbar.Percentage(),
@@ -78,20 +95,22 @@ class DRR(Cusp):
 
         for j_i, omegai, i in zip(self.j, self.omega,
                                   pbar(range(self.j.size))):
-            drr[i, :] = self._drr(j_i, omegai, [l, n, n_p], neval=neval)
-        return drr
+            drr[i], drr_err[i] = self._drr(j_i, omegai, [l, n, n_p],
+                                           neval=neval)
+        return drr, drr_err
 
-    def tau2(self, l_max, neval=1e3):
+    def tau2(self, l_max, neval=1e3, include_zero=True):
+        n_p_min = 0 if include_zero else 1
         tau2 = sum([self._tau2_lnnp(l, n, n_p, neval=neval)[0]
                     for l in range(1, l_max + 1)
                     for n in range(1, l+1)
-                    for n_p in range(0, l+1)
+                    for n_p in range(n_p_min, l+1)
                     if not mod(l+n, 2)+mod(l+n_p, 2)])
 
         tau2_err = sqrt(sum([self._tau2_lnnp(l, n, n, neval=neval)[-1]**2
                              for l in range(1, l_max + 1)
                              for n in range(1, l+1)
-                             for n_p in range(0, l+1)
+                             for n_p in range(n_p_min, l+1)
                              if not mod(l+n, 2)+mod(l+n_p, 2)]))
         return tau2, tau2_err
 
@@ -118,8 +137,6 @@ class DRR(Cusp):
         return tau2, tau2_err
 
     def _drr(self, j, omega, lnnp, neval=1e3):
-        if np.mod(l + n, 2) or np.mod(l + n_p, 2):
-            return 0, 0
 
         tau2, tau2_err = np.zeros([2, self.j.size])
 
@@ -150,15 +167,32 @@ class DRR(Cusp):
         tau2, tau2_err = np.zeros([2, self.j.size])
 
         integ = vegas.Integrator(6 * [[0, 1]])
-
+        sma = self.sma
+        gamma = self.gamma
+        rh = self.rh
+        l,n, n_p = lnnp
+        j2 = j**2
+        ecc = sqrt(1-j**2)
         @vegas.batchintegrand
+#        @jit(nopython=True)
         def Clnnp(x):
             true_anomaly = x[:, :-2].T*np.pi
-            sma_f = self.inverse_cumulative_a(x[:, -2])
-            j_f = sqrt(x[:, -1])
-            return A2_integrand(self.sma, j, sma_f, j_f, lnnp, true_anomaly)
-        return 4*(np.array(integrate(Clnnp, integ, neval)) *
-                  _A2_norm_factor(*lnnp)*lnnp[1]**2)
+            sma_p = (x[:, -2])**(1/(3-gamma))*rh
+            j2_p = x[:, -1]
+            cnnp = np.cos(true_anomaly.T*np.array([n, n, n_p, n_p])).T
+            cnnp = cnnp[0]*cnnp[1]*cnnp[2]*cnnp[3]
+            eccp = sqrt(1-j2_p)
+            r12 = sma*j2/(1-ecc*np.cos(true_anomaly[:2]))
+            rp12 = sma_p*j2_p/(1-eccp*np.cos(true_anomaly[2:]))
+            r_1, r_2 = r12[0], r12[-1]
+            rp1, rp2 = rp12[0], rp12[-1]
+            return (cnnp/j2_p/sma_p**4 *
+                    (np.minimum(r_1, rp1)*np.minimum(r_2, rp2))**(2*l+1) /
+                    (r_1*r_2*rp1*rp2)**(l-1))
+        # Symmetry factor for using n>0 and n_p >= 0
+        symmetry_factor = 2 if n_p == 0 else 4
+        return symmetry_factor*(np.array(integrate(Clnnp, integ, neval)) *
+                                _A2_norm_factor(*lnnp)*lnnp[1]**2)/j2/sma**2
 
 
 def integrate(func, integ, neval):
@@ -169,16 +203,18 @@ def integrate(func, integ, neval):
     except TypeError:
         return result.val, np.sqrt(result.var)
 
-
-def A2_integrand(sma, j, sma_p, j_p, lnnp, true_anomaly):
+#@jit(nopython=True)
+def A2_integrand(sma, j, sma_p, j_p, l, n, n_p, true_anomaly):
     """
     returns the |alnnp|^2 integrand to use the the MC integration
     """
-    l, n, n_p = lnnp
-    cnnp = np.prod(np.cos(true_anomaly.T*np.array([n, n, n_p, n_p])), 1)
+    cnnp = np.cos(true_anomaly.T*np.array([n, n, n_p, n_p])).T
+    cnnp = cnnp[0]*cnnp[1]*cnnp[2]*cnnp[3]
     ecc, eccp = np.sqrt(1-j**2), np.sqrt(1-j_p**2)
-    r_1, r_2 = (sma*(1-ecc**2)/(1-ecc*np.cos(true_anomaly[:2])))
-    rp1, rp2 = (sma_p*(1-eccp**2)/(1-eccp*np.cos(true_anomaly[2:])))
+    r12 = (sma*(1-ecc**2)/(1-ecc*np.cos(true_anomaly[:2])))
+    rp12 = (sma_p*(1-eccp**2)/(1-eccp*np.cos(true_anomaly[2:])))
+    r_1, r_2 = r12[0], r12[-1]
+    rp1, rp2 = rp12[0], rp12[-1]
     return (cnnp/j**2/j_p**2/sma**2/sma_p**4 *
             (np.minimum(r_1, rp1)*np.minimum(r_2, rp2))**(2*l+1) /
             (r_1*r_2*rp1*rp2)**(l-1))

@@ -5,12 +5,11 @@ A module for calculating Resonant Relaxation diffusion coefficients
 from functools import lru_cache
 
 import numpy as np
-from numpy import mod
-from numpy import sqrt
 import progressbar
 import vegas
+from numpy import mod
+from numpy import sqrt
 from scipy import special
-from numba import jit
 
 from .cusp import Cusp
 
@@ -174,7 +173,6 @@ class DRR(Cusp):
         j2 = j**2
         ecc = sqrt(1-j**2)
         @vegas.batchintegrand
-#        @jit(nopython=True)
         def Clnnp(x):
             true_anomaly = x[:, :-2].T*np.pi
             sma_p = (x[:, -2])**(1/(3-gamma))*rh
@@ -203,7 +201,6 @@ def integrate(func, integ, neval):
     except TypeError:
         return result.val, np.sqrt(result.var)
 
-#@jit(nopython=True)
 def A2_integrand(sma, j, sma_p, j_p, l, n, n_p, true_anomaly):
     """
     returns the |alnnp|^2 integrand to use the the MC integration

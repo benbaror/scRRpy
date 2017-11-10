@@ -15,6 +15,6 @@ def test_main():
 
 def test_drr():
     drr = DRR(0.1)
-    d = drr.drr(1, 1, 1, 1e3)
+    d = drr._drr_lnnp(1, 1, 1, 1e3)[0]
     print(d.min())
     assert (d > 0).all(), d.min()

@@ -11,6 +11,9 @@ from numpy import mod
 from numpy import sqrt
 from scipy import special
 
+import functools
+import multiprocessing as mp
+
 from .cusp import Cusp
 
 
@@ -61,18 +64,16 @@ class DRR(Cusp):
                              lnnp[0], lnnp[1], lnnp[-1],
                              true_anomaly))
 
-    def drr(self, l_max, neval=1e3):
-        drr = sum([self._drr_lnnp(l, n, n_p, neval=neval)[0]
-                   for l in range(1, l_max + 1)
-                   for n in range(1, l+1)
-                   for n_p in range(1, l+1)
-                   if not mod(l+n, 2)+mod(l+n_p, 2)])
+    def drr(self, l_max, neval=1e3, threads=1):
+        lnnp = [(l, n, n_p)
+               for l in range(1, l_max + 1)
+               for n in range(1, l+1)
+               for n_p in range(1, l+1)
+               if not mod(l+n, 2)+mod(l+n_p, 2)]
 
-        drr_err = sqrt(sum([self._drr_lnnp(l, n, n, neval=neval)[-1]**2
-                            for l in range(1, l_max + 1)
-                            for n in range(1, l+1)
-                            for n_p in range(0, l+1)
-                            if not mod(l+n, 2)+mod(l+n_p, 2)]))
+        drr = sum((self._drr_lnnp(*lnnp, neval=neval)[0] for lnnp in  lnnp))
+        drr_err = sqrt(sum(self._drr_lnnp(*lnnp, neval=neval)[-1]**2
+                            for lnnp in lnnp))
         return drr, drr_err
 
     @lru_cache()
@@ -80,7 +81,6 @@ class DRR(Cusp):
         """
         Calculates the l,n,n_p term of the diffusion coefficient
         """
-
         drr, drr_err = np.zeros([2, self.j.size])
 
         widgets = ['{}, {}, {}'.format(l, n, n_p), ' ',
@@ -136,12 +136,11 @@ class DRR(Cusp):
 
     def _drr(self, j, omega, lnnp, neval=1e3):
 
-        tau2, tau2_err = np.zeros([2, self.j.size])
-
         integ = vegas.Integrator(5 * [[0, 1]])
         ratio = lnnp[1]/lnnp[-1]
 
-        @vegas.batchintegrand
+        #        @vegas.batchintegrand
+        @parallelintegrand
         def Clnnp(x):
             true_anomaly = x[:, :-1].T*np.pi
             sma_f = self.inverse_cumulative_a(x[:, -1])
@@ -155,7 +154,7 @@ class DRR(Cusp):
             x[ix2] = self._integrand(j, sma_f[ix2], jf2[ix2], lnnp,
                                      true_anomaly[:, ix2])
             return x
-        return 2*(np.array(integrate(Clnnp, integ, neval)) *
+        return 4*np.pi*(np.array(integrate(Clnnp, integ, neval)) *
                   _A2_norm_factor(*lnnp)*lnnp[1]**2)
 
     def _tau2(self, j, lnnp, neval=1e3):
@@ -194,7 +193,7 @@ class DRR(Cusp):
 
 
 def integrate(func, integ, neval):
-    result = integ(func, nitn=10, neval=neval)
+    result = integ(func, nitn=10, neval=neval/5)
     result = integ(func, nitn=10, neval=neval)
     try:
         return np.array([[r.val, np.sqrt(r.var)] for r in result]).T
@@ -305,3 +304,43 @@ class ResInterp(object):
             return np.interp(af, self._af[j > 0], j[j > 0], left=0, right=0)
         else:
             return af*0.0
+
+
+class parallelintegrand(vegas.BatchIntegrand):
+    """ Convert (batch) integrand into multiprocessor integrand.
+
+    Integrand should return a numpy array.
+    """
+    def __init__(self, fcn, nproc=4):
+        " Save integrand; create pool of nproc processes. "
+        self.fcn = fcn
+        self.nproc = nproc
+    # def __del__(self):
+    #     " Standard cleanup. "
+    #     self.pool.close()
+    #     self.pool.join()
+    def func(self, x):
+        self.queue.put(self.fcn(x))
+
+    def __call__(self, x):
+        " Divide x into self.nproc chunks, feeding one to each process. "
+        nx = x.shape[0] // self.nproc + 1
+        # launch evaluation of self.fcn for each chunk, in parallel
+        self.queue = mp.Queue()
+        xs = [x[i*nx : (i+1)*nx] for i in range(self.nproc)]
+        print(x.size, len(xs), xs[0].size)
+        processes = [mp.Process(target=self.func, args=(x,))
+                     for x in xs]
+        for p in processes:
+            p.start()
+        for p in processes:
+            p.join()
+
+        results = [self.queue.get() for p in processes]
+        # convert list of results into a single numpy array
+        return np.concatenate(results)
+
+
+
+def get_drr(drr, neval, lnnp):
+    return drr._drr_lnnp(*lnnp, neval=neval)

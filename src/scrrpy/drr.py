@@ -57,7 +57,8 @@ class DRR(Cusp):
 
     def _integrand(self, j, sma_p, j_p, lnnp, true_anomaly):
         return (2*j_p/abs(self.d_nu_p(sma_p, j_p))/lnnp[-1] *
-                A2_integrand(self.sma, j, sma_p, j_p, lnnp[0], lnnp[1], lnnp[-1],
+                A2_integrand(self.sma, j, sma_p, j_p,
+                             lnnp[0], lnnp[1], lnnp[-1],
                              true_anomaly))
 
     def drr(self, l_max, neval=1e3):
@@ -73,7 +74,6 @@ class DRR(Cusp):
                             for n_p in range(0, l+1)
                             if not mod(l+n, 2)+mod(l+n_p, 2)]))
         return drr, drr_err
-
 
     @lru_cache()
     def _drr_lnnp(self, l, n, n_p, neval=1e3):
@@ -129,7 +129,6 @@ class DRR(Cusp):
 
         pbar = progressbar.ProgressBar(widgets=widgets)
 
-
         for j_i, omegai, i in zip(self.j, self.omega,
                                   pbar(range(self.j.size))):
             tau2[i], tau2_err[i] = self._tau2(j_i, [l, n, n_p], neval=neval)
@@ -169,9 +168,10 @@ class DRR(Cusp):
         sma = self.sma
         gamma = self.gamma
         rh = self.rh
-        l,n, n_p = lnnp
+        l, n, n_p = lnnp
         j2 = j**2
         ecc = sqrt(1-j**2)
+
         @vegas.batchintegrand
         def Clnnp(x):
             true_anomaly = x[:, :-2].T*np.pi
@@ -200,6 +200,7 @@ def integrate(func, integ, neval):
         return np.array([[r.val, np.sqrt(r.var)] for r in result]).T
     except TypeError:
         return result.val, np.sqrt(result.var)
+
 
 def A2_integrand(sma, j, sma_p, j_p, l, n, n_p, true_anomaly):
     """

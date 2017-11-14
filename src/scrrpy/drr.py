@@ -71,17 +71,47 @@ class DRR(Cusp):
                for n_p in range(1, l+1)
                if not mod(l+n, 2)+mod(l+n_p, 2)]
 
-        drr = sum((self._drr_lnnp(*lnnp, neval=neval)[0] for lnnp in  lnnp))
-        drr_err = sqrt(sum(self._drr_lnnp(*lnnp, neval=neval)[-1]**2
-                            for lnnp in lnnp))
+        pbar = progressbar.ProgressBar()(range(len(lnnp)-1))
+
+
+        drr = sum((self._drr_lnnp(*lnnp, neval=neval, threads=threads)[0]
+                   for lnnp, _ in  zip(lnnp, pbar)))
+        drr_err = sqrt(sum(self._drr_lnnp(*lnnp, neval=neval,
+                                          threads=threads)[-1]**2
+                           for lnnp in lnnp))
         return drr, drr_err
 
     @lru_cache()
-    def _drr_lnnp(self, l, n, n_p, neval=1e3):
+    def _drr_lnnp(self, l, n, n_p, neval=1e3, threads=1):
         """
         Calculates the l,n,n_p term of the diffusion coefficient
         """
-        drr, drr_err = np.zeros([2, self.j.size])
+
+        if threads > 1:
+            queue = mp.Queue()
+            def parallel_drr(pos, j, omega):
+                results = [self._drr(j, omega, [l, n, n_p], neval=neval)
+                           for j, omega in zip(j, omega)]
+                drr = [result[0] for result in results]
+                drr_err = [result[-1] for result in results]
+                queue.put((pos, (drr, drr_err)))
+
+            nchunks = self.j.shape[0] // threads + 1
+            js = [self.j[i*nchunks: (i+1)*nchunks] for i in range(threads)]
+            omegas = [self.omega[i*nchunks: (i+1)*nchunks]
+                      for i in range(threads)]
+            processes = [mp.Process(target=parallel_drr, args=(i, *x))
+                         for i, x in enumerate(zip(js, omegas))]
+            for processe in processes:
+                processe.start()
+            for processe in processes:
+                processe.join()
+
+                results = [queue.get() for p in processes]
+                results.sort()
+                drr = np.concatenate([result[-1][0] for result in results])
+                drr_err = np.concatenate([result[-1][1] for result in results])
+                return drr, drr_err
 
         widgets = ['{}, {}, {}'.format(l, n, n_p), ' ',
                    progressbar.Percentage(),
@@ -91,6 +121,9 @@ class DRR(Cusp):
                    progressbar.AdaptiveETA()]
 
         pbar = progressbar.ProgressBar(widgets=widgets)
+
+        drr, drr_err = np.zeros([2, self.j.size])
+
 
         for j_i, omegai, i in zip(self.j, self.omega,
                                   pbar(range(self.j.size))):
@@ -139,8 +172,7 @@ class DRR(Cusp):
         integ = vegas.Integrator(5 * [[0, 1]])
         ratio = lnnp[1]/lnnp[-1]
 
-        #        @vegas.batchintegrand
-        @parallelintegrand
+        @vegas.batchintegrand
         def Clnnp(x):
             true_anomaly = x[:, :-1].T*np.pi
             sma_f = self.inverse_cumulative_a(x[:, -1])
@@ -304,42 +336,6 @@ class ResInterp(object):
             return np.interp(af, self._af[j > 0], j[j > 0], left=0, right=0)
         else:
             return af*0.0
-
-
-class parallelintegrand(vegas.BatchIntegrand):
-    """ Convert (batch) integrand into multiprocessor integrand.
-
-    Integrand should return a numpy array.
-    """
-    def __init__(self, fcn, nproc=4):
-        " Save integrand; create pool of nproc processes. "
-        self.fcn = fcn
-        self.nproc = nproc
-    # def __del__(self):
-    #     " Standard cleanup. "
-    #     self.pool.close()
-    #     self.pool.join()
-    def func(self, x):
-        self.queue.put(self.fcn(x))
-
-    def __call__(self, x):
-        " Divide x into self.nproc chunks, feeding one to each process. "
-        nx = x.shape[0] // self.nproc + 1
-        # launch evaluation of self.fcn for each chunk, in parallel
-        self.queue = mp.Queue()
-        xs = [x[i*nx : (i+1)*nx] for i in range(self.nproc)]
-        print(x.size, len(xs), xs[0].size)
-        processes = [mp.Process(target=self.func, args=(x,))
-                     for x in xs]
-        for p in processes:
-            p.start()
-        for p in processes:
-            p.join()
-
-        results = [self.queue.get() for p in processes]
-        # convert list of results into a single numpy array
-        return np.concatenate(results)
-
 
 
 def get_drr(drr, neval, lnnp):

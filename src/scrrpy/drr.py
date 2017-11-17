@@ -39,7 +39,7 @@ class DRR(Cusp):
                          gamma=1.75,
                          mbh=4e6,
                          mstar=1,
-                         Njs=101,
+                         Njs=201,
                          rh=2),
                   **kwargs}
 

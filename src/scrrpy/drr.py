@@ -89,7 +89,8 @@ class DRR(Cusp):
 
         if threads > 1:
             queue = mp.Queue()
-            def parallel_drr(pos, j, omega):
+            def parallel_drr(pos, seed, j, omega):
+                np.random.seed(seed)
                 results = [self._drr(j, omega, [l, n, n_p], neval=neval)
                            for j, omega in zip(j, omega)]
                 drr = [result[0] for result in results]
@@ -100,8 +101,9 @@ class DRR(Cusp):
             js = [self.j[i*nchunks: (i+1)*nchunks] for i in range(threads)]
             omegas = [self.omega[i*nchunks: (i+1)*nchunks]
                       for i in range(threads)]
+            seeds = np.random.randint(1e6, size=threads)
             processes = [mp.Process(target=parallel_drr, args=(i, *x))
-                         for i, x in enumerate(zip(js, omegas))]
+                         for i, x in enumerate(zip(seeds, js, omegas))]
             for processe in processes:
                 processe.start()
             for processe in processes:

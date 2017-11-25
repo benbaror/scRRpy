@@ -81,11 +81,21 @@ class DRR(Cusp):
                            for lnnp in lnnp))
         return drr, drr_err
 
-    @lru_cache()
     def _drr_lnnp(self, l, n, n_p, neval=1e3, threads=1):
         """
         Calculates the l,n,n_p term of the diffusion coefficient
         """
+        neval = int(neval)
+        try:
+            drr =  (self._drr_lnnp_cache[(l, n, n_p, neval)][0] +
+                    self._drr_lnnp_cache[(l, n, -n_p, neval)][0])
+            drr_err = sqrt(self._drr_lnnp_cache[(l, n, n_p, neval)][-1]**2 +
+                           self._drr_lnnp_cache[(l, n, -n_p, neval)][-1]**2)
+            return drr, drr_err
+        except AttributeError:
+            self._drr_lnnp_cache = {}
+        except KeyError:
+            pass
 
         if threads > 1:
             queue = mp.Queue()
@@ -109,29 +119,39 @@ class DRR(Cusp):
             for processe in processes:
                 processe.join()
 
-                results = [queue.get() for p in processes]
-                results.sort()
-                drr = np.concatenate([result[-1][0] for result in results])
-                drr_err = np.concatenate([result[-1][1] for result in results])
-                return drr, drr_err
+            results = [queue.get() for p in processes]
+            results.sort()
+            drr = np.concatenate([result[-1][0] for result in results])
+            drr_err = np.concatenate([result[-1][1] for result in results])
 
-        widgets = ['{}, {}, {}'.format(l, n, n_p), ' ',
-                   progressbar.Percentage(),
-                   ' (', progressbar.SimpleProgress(), ')', ' ',
-                   progressbar.Bar(), ' ',
-                   progressbar.Timer(), ' ',
-                   progressbar.AdaptiveETA()]
+        else:
+            widgets = ['{}, {}, {}'.format(l, n, n_p), ' ',
+                       progressbar.Percentage(),
+                       ' (', progressbar.SimpleProgress(), ')', ' ',
+                       progressbar.Bar(), ' ',
+                       progressbar.Timer(), ' ',
+                       progressbar.AdaptiveETA()]
 
-        pbar = progressbar.ProgressBar(widgets=widgets)
+            pbar = progressbar.ProgressBar(widgets=widgets)
 
-        drr, drr_err = np.zeros([2, self.j.size])
+            drr, drr_err = np.zeros([2, 2, self.j.size])
 
 
-        for j_i, omegai, i in zip(self.j, self.omega,
-                                  pbar(range(self.j.size))):
-            drr[i], drr_err[i] = self._drr(j_i, omegai, [l, n, n_p],
-                                           neval=neval)
+            for j_i, omegai, i in zip(self.j, self.omega,
+                                      pbar(range(self.j.size))):
+                drr[i], drr_err[i] = self._drr(j_i, omegai, [l, n, n_p],
+                                               neval=neval)
+
+        self._drr_lnnp_cache[l, n, -n_p, neval] = (drr[:, 0], drr_err[:, 0])
+        self._drr_lnnp_cache[l, n, n_p, neval] = (drr[:, -1], drr_err[:, -1])
+
+        drr =  (self._drr_lnnp_cache[(l, n, n_p, neval)][0] +
+                self._drr_lnnp_cache[(l, n, -n_p, neval)][0])
+        drr_err = sqrt(self._drr_lnnp_cache[(l, n, n_p, neval)][-1]**2 +
+                       self._drr_lnnp_cache[(l, n, -n_p, neval)][-1]**2)
         return drr, drr_err
+
+
 
     def tau2(self, l_max, neval=1e3, include_zero=True):
         n_p_min = 0 if include_zero else 1
@@ -180,16 +200,16 @@ class DRR(Cusp):
             sma_f = self.inverse_cumulative_a(x[:, -1])
             jf1 = self._res_intrp(ratio).get_jf1(omega*ratio, sma_f)
             jf2 = self._res_intrp(ratio).get_jf2(omega*ratio, sma_f)
-            x = np.zeros_like(sma_f)
+            res = np.zeros((x.shape[0], 2), float)
             ix1 = jf1 > 0
             ix2 = jf2 > 0
-            x[ix1] = self._integrand(j, sma_f[ix1], jf1[ix1], lnnp,
-                                     true_anomaly[:, ix1])
-            x[ix2] = self._integrand(j, sma_f[ix2], jf2[ix2], lnnp,
-                                     true_anomaly[:, ix2])
-            return x
+            res[ix1, 0] = self._integrand(j, sma_f[ix1], jf1[ix1], lnnp,
+                                          true_anomaly[:, ix1])
+            res[ix2, 1] = self._integrand(j, sma_f[ix2], jf2[ix2], lnnp,
+                                          true_anomaly[:, ix2])
+            return res
         return 4*np.pi*(np.array(integrate(Clnnp, integ, neval)) *
-                  _A2_norm_factor(*lnnp)*lnnp[1]**2)
+                        _A2_norm_factor(*lnnp)*lnnp[1]**2)
 
     def _tau2(self, j, lnnp, neval=1e3):
         if np.mod(lnnp[0] + lnnp[1], 2) or np.mod(lnnp[0] + lnnp[-1], 2):

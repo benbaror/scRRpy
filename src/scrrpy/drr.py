@@ -10,6 +10,7 @@ import vegas
 from numpy import mod
 from numpy import sqrt
 from scipy import special
+import h5py
 
 import functools
 import multiprocessing as mp
@@ -94,13 +95,13 @@ class DRR(Cusp):
         """
         neval = int(neval)
         try:
-            drr =  (self._drr_lnnp_cache[(l, n, n_p, neval, tol)][0] +
-                    self._drr_lnnp_cache[(l, n, -n_p, neval, tol)][0])
+            drr =  (self._drr_lnnp_cache[str((l, n, n_p, neval, tol))][0] +
+                    self._drr_lnnp_cache[str((l, n, -n_p, neval, tol))][0])
 
-            drr_err = sqrt(self._drr_lnnp_cache[(l, n, n_p, neval,
-                                                 tol)][-1]**2 +
-                           self._drr_lnnp_cache[(l, n, -n_p, neval,
-                                                 tol)][-1]**2)
+            drr_err = sqrt(self._drr_lnnp_cache[str((l, n, n_p, neval,
+                                                     tol))][-1]**2 +
+                           self._drr_lnnp_cache[str((l, n, -n_p, neval,
+                                                     tol))][-1]**2)
             return drr, drr_err
         except AttributeError:
             self._drr_lnnp_cache = {}
@@ -156,17 +157,17 @@ class DRR(Cusp):
             drr = np.array([result[0] for result in results])
             drr_err = np.array([result[-1] for result in results])
 
-        self._drr_lnnp_cache[(l, n, -n_p,
-                              neval, tol)] = (drr[:, 0], drr_err[:, 0])
-        self._drr_lnnp_cache[(l, n, n_p,
-                              neval, tol)] = (drr[:, -1], drr_err[:, -1])
+        self._drr_lnnp_cache[str((l, n, -n_p,
+                                  neval, tol))] = (drr[:, 0], drr_err[:, 0])
+        self._drr_lnnp_cache[str((l, n, n_p,
+                                  neval, tol))] = (drr[:, -1], drr_err[:, -1])
 
-        drr = (self._drr_lnnp_cache[(l, n, n_p, neval, tol)][0] +
-               self._drr_lnnp_cache[(l, n, -n_p, neval, tol)][0])
-        drr_err = sqrt(self._drr_lnnp_cache[(l, n, n_p, neval,
-                                             tol)][-1]**2 +
-                       self._drr_lnnp_cache[(l, n, -n_p, neval,
-                                             tol)][-1]**2)
+        drr = (self._drr_lnnp_cache[str((l, n, n_p, neval, tol))][0] +
+               self._drr_lnnp_cache[str((l, n, -n_p, neval, tol))][0])
+        drr_err = sqrt(self._drr_lnnp_cache[str((l, n, n_p, neval,
+                                                 tol))][-1]**2 +
+                       self._drr_lnnp_cache[str((l, n, -n_p, neval,
+                                                 tol))][-1]**2)
         return drr, drr_err
 
 
@@ -263,6 +264,34 @@ class DRR(Cusp):
         return symmetry_factor*(np.array(integrate(Clnnp, integ, neval)) *
                                 _A2_norm_factor(*lnnp)*lnnp[1]**2)/j2/sma**2
 
+
+    def save(self, file_name):
+        """
+        Save the cached data to an hdf5 file so it can be read latter.
+        """
+        with h5py.File(file_name,'w') as h5:
+            drr_lnnp_cache = h5.create_group("_drr_lnnp_cache")
+            for key, value in self._drr_lnnp_cache.items():
+                drr_lnnp_cache[key] = value
+            for key, value in self.__dict__.items():
+                if key != '_drr_lnnp_cache':
+                    h5[key] = value
+
+    def read(self, file_name):
+        """
+        Read the cached data from an hdf5 file
+        """
+        with h5py.File(file_name, 'r') as h5:
+
+            for key, value in h5['_drr_lnnp_cache'].items():
+                try:
+                    self._drr_lnnp_cache[key] = value.value
+                except AttributeError:
+                    self._drr_lnnp_cache = {key: value.value}
+
+            for key, value in h5.items():
+                if key != '_drr_lnnp_cache':
+                    setattr(self, key, value.value)
 
 def integrate(func, integ, neval=1e4, tol=0.0):
     n = neval

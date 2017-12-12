@@ -40,6 +40,7 @@ class DRR(Cusp):
                          mbh=4e6,
                          mstar=1,
                          Njs=201,
+                         gr_factor=1,
                          rh=2),
                   **kwargs}
 
@@ -49,6 +50,7 @@ class DRR(Cusp):
                          rh=kwargs['rh'])
 
         self.sma = sma
+        self.gr_factor = kwargs['gr_factor']
         self.j = np.logspace(np.log10(self.jlc(self.sma)), 0,
                              kwargs['Njs'])[:-1]
         self.omega = abs(self.nu_p(self.sma, self.j))
@@ -56,7 +58,7 @@ class DRR(Cusp):
 
     @lru_cache()
     def _res_intrp(self, ratio):
-        return ResInterp(self, self.omega*ratio)
+        return ResInterp(self, self.omega*ratio, self.gr_factor)
 
     def _integrand(self, j, sma_p, j_p, lnnp, true_anomaly):
         return (2*j_p/abs(self.d_nu_p(sma_p, j_p))/lnnp[-1] *
@@ -64,33 +66,41 @@ class DRR(Cusp):
                              lnnp[0], lnnp[1], lnnp[-1],
                              true_anomaly))
 
-    def drr(self, l_max, neval=1e3, threads=1):
+    def drr(self, l_max, neval=1e3, threads=1, tol=0.0):
         lnnp = [(l, n, n_p)
                for l in range(1, l_max + 1)
                for n in range(1, l+1)
                for n_p in range(1, l+1)
                if not mod(l+n, 2)+mod(l+n_p, 2)]
 
-        pbar = progressbar.ProgressBar()(range(len(lnnp)-1))
+        pbar = progressbar.ProgressBar()(range(len(lnnp)))
 
+        for i in pbar:
+            self._drr_lnnp(*lnnp[i], neval=neval, threads=threads, tol=tol)
 
-        drr = sum((self._drr_lnnp(*lnnp, neval=neval, threads=threads)[0]
-                   for lnnp, _ in  zip(lnnp, pbar)))
+        drr = sum((self._drr_lnnp(*lnnp, neval=neval, threads=threads,
+                                  tol=tol)[0]
+                   for lnnp in  lnnp))
         drr_err = sqrt(sum(self._drr_lnnp(*lnnp, neval=neval,
-                                          threads=threads)[-1]**2
+                                          threads=threads,
+                                          tol=tol)[-1]**2
                            for lnnp in lnnp))
         return drr, drr_err
 
-    def _drr_lnnp(self, l, n, n_p, neval=1e3, threads=1):
+    def _drr_lnnp(self, l, n, n_p, neval=1e3, threads=1,
+                  tol=0.0):
         """
         Calculates the l,n,n_p term of the diffusion coefficient
         """
         neval = int(neval)
         try:
-            drr =  (self._drr_lnnp_cache[(l, n, n_p, neval)][0] +
-                    self._drr_lnnp_cache[(l, n, -n_p, neval)][0])
-            drr_err = sqrt(self._drr_lnnp_cache[(l, n, n_p, neval)][-1]**2 +
-                           self._drr_lnnp_cache[(l, n, -n_p, neval)][-1]**2)
+            drr =  (self._drr_lnnp_cache[(l, n, n_p, neval, tol)][0] +
+                    self._drr_lnnp_cache[(l, n, -n_p, neval, tol)][0])
+
+            drr_err = sqrt(self._drr_lnnp_cache[(l, n, n_p, neval,
+                                                 tol)][-1]**2 +
+                           self._drr_lnnp_cache[(l, n, -n_p, neval,
+                                                 tol)][-1]**2)
             return drr, drr_err
         except AttributeError:
             self._drr_lnnp_cache = {}
@@ -101,16 +111,18 @@ class DRR(Cusp):
             queue = mp.Queue()
             def parallel_drr(pos, seed, j, omega):
                 np.random.seed(seed)
-                results = [self._drr(j, omega, [l, n, n_p], neval=neval)
+                results = [self._drr(j, omega, [l, n, n_p], neval=neval,
+                                     tol=tol)
                            for j, omega in zip(j, omega)]
                 drr = [result[0] for result in results]
                 drr_err = [result[-1] for result in results]
                 queue.put((pos, (drr, drr_err)))
 
-            nchunks = self.j.shape[0] // threads + 1
-            js = [self.j[i*nchunks: (i+1)*nchunks] for i in range(threads)]
-            omegas = [self.omega[i*nchunks: (i+1)*nchunks]
-                      for i in range(threads)]
+            js = [self.j[i::threads] for i in range(threads)]
+            omegas = [self.omega[i::threads] for i in range(threads)]
+            r = np.arange(self.j.size)
+            resort =  np.argsort(np.concatenate([r[i::threads]
+                                                  for i in range(threads)]))
             seeds = np.random.randint(1e6, size=threads)
             processes = [mp.Process(target=parallel_drr, args=(i, *x))
                          for i, x in enumerate(zip(seeds, js, omegas))]
@@ -121,8 +133,10 @@ class DRR(Cusp):
 
             results = [queue.get() for p in processes]
             results.sort()
-            drr = np.concatenate([result[-1][0] for result in results])
-            drr_err = np.concatenate([result[-1][1] for result in results])
+            drr = np.concatenate([result[-1][0] for result in results])[resort]
+
+            drr_err = np.concatenate([result[-1][1]
+                                      for result in results])[resort]
 
         else:
             widgets = ['{}, {}, {}'.format(l, n, n_p), ' ',
@@ -134,21 +148,25 @@ class DRR(Cusp):
 
             pbar = progressbar.ProgressBar(widgets=widgets)
 
-            drr, drr_err = np.zeros([2, 2, self.j.size])
 
+            results = [self._drr(j, omega, [l, n, n_p], neval=neval, tol=tol)
+                       for j, omega, i in zip(self.j, self.omega,
+                                              pbar(range(self.j.size)))]
 
-            for j_i, omegai, i in zip(self.j, self.omega,
-                                      pbar(range(self.j.size))):
-                drr[i], drr_err[i] = self._drr(j_i, omegai, [l, n, n_p],
-                                               neval=neval)
+            drr = np.array([result[0] for result in results])
+            drr_err = np.array([result[-1] for result in results])
 
-        self._drr_lnnp_cache[l, n, -n_p, neval] = (drr[:, 0], drr_err[:, 0])
-        self._drr_lnnp_cache[l, n, n_p, neval] = (drr[:, -1], drr_err[:, -1])
+        self._drr_lnnp_cache[(l, n, -n_p,
+                              neval, tol)] = (drr[:, 0], drr_err[:, 0])
+        self._drr_lnnp_cache[(l, n, n_p,
+                              neval, tol)] = (drr[:, -1], drr_err[:, -1])
 
-        drr =  (self._drr_lnnp_cache[(l, n, n_p, neval)][0] +
-                self._drr_lnnp_cache[(l, n, -n_p, neval)][0])
-        drr_err = sqrt(self._drr_lnnp_cache[(l, n, n_p, neval)][-1]**2 +
-                       self._drr_lnnp_cache[(l, n, -n_p, neval)][-1]**2)
+        drr = (self._drr_lnnp_cache[(l, n, n_p, neval, tol)][0] +
+               self._drr_lnnp_cache[(l, n, -n_p, neval, tol)][0])
+        drr_err = sqrt(self._drr_lnnp_cache[(l, n, n_p, neval,
+                                             tol)][-1]**2 +
+                       self._drr_lnnp_cache[(l, n, -n_p, neval,
+                                             tol)][-1]**2)
         return drr, drr_err
 
 
@@ -189,8 +207,7 @@ class DRR(Cusp):
             tau2[i], tau2_err[i] = self._tau2(j_i, [l, n, n_p], neval=neval)
         return tau2, tau2_err
 
-    def _drr(self, j, omega, lnnp, neval=1e3):
-
+    def _drr(self, j, omega, lnnp, neval=1e3, tol=0.0):
         integ = vegas.Integrator(5 * [[0, 1]])
         ratio = lnnp[1]/lnnp[-1]
 
@@ -208,8 +225,9 @@ class DRR(Cusp):
             res[ix2, 1] = self._integrand(j, sma_f[ix2], jf2[ix2], lnnp,
                                           true_anomaly[:, ix2])
             return res
-        return 4*np.pi*(np.array(integrate(Clnnp, integ, neval)) *
-                        _A2_norm_factor(*lnnp)*lnnp[1]**2)
+        return 4*np.pi*(np.array(integrate(Clnnp, integ, neval, tol)) *
+                        _A2_norm_factor(*lnnp)*lnnp[1]**2 *
+                        self.nu_r(self.sma)**2/self.Q)
 
     def _tau2(self, j, lnnp, neval=1e3):
         if np.mod(lnnp[0] + lnnp[1], 2) or np.mod(lnnp[0] + lnnp[-1], 2):
@@ -246,13 +264,16 @@ class DRR(Cusp):
                                 _A2_norm_factor(*lnnp)*lnnp[1]**2)/j2/sma**2
 
 
-def integrate(func, integ, neval):
-    result = integ(func, nitn=10, neval=neval/5)
+def integrate(func, integ, neval=1e4, tol=0.0):
+    n = neval
+    integ.set(rtol=tol)
+    result = integ(func, nitn=10, neval=neval)
     result = integ(func, nitn=10, neval=neval)
     try:
-        return np.array([[r.val, np.sqrt(r.var)] for r in result]).T
+        res, err = np.array([[r.val, np.sqrt(r.var)] for r in result]).T
     except TypeError:
-        return result.val, np.sqrt(result.var)
+        res, err = result.val, np.sqrt(result.var)
+    return res, err
 
 
 def A2_integrand(sma, j, sma_p, j_p, l, n, n_p, true_anomaly):
@@ -275,7 +296,6 @@ def A2_integrand(sma, j, sma_p, j_p, l, n, n_p, true_anomaly):
 def _A2_norm_factor(l, n, n_p):
     """
     Normalization factor for |alnnp|^2
-    ! To be implemented
     """
 
     return (abs(special.sph_harm(n, l, 0, np.pi/2))**2 *
@@ -288,10 +308,11 @@ class ResInterp(object):
     Interpolation function for the resonant condition
     """
 
-    def __init__(self, cusp, omega):
+    def __init__(self, cusp, omega, gr_factor=1.0):
         """
         """
         self._cusp = cusp
+        self._cusp.gr_factor = gr_factor
         self.omega = omega
         self._af = np.logspace(np.log10(self._cusp.rg),
                                np.log10(self._cusp.rh),
@@ -304,6 +325,8 @@ class ResInterp(object):
             nup = nup[nup > 0]
             s = np.argsort(nup)
             j = np.interp(self.omega, nup[s], jf[s], left=0, right=0)
+
+
             # j[self.omega < nup.min()] = 0
             # j[self.omega > nup.max()] = 0
             return j

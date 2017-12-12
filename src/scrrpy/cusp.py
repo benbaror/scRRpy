@@ -22,6 +22,7 @@ class Cusp(object):
         self.mbh = mbh
         self.mstar = mstar
         self.rh = rh
+        self.gr_factor = 1.0
 
     @property
     def rg(self):
@@ -122,7 +123,7 @@ class Cusp(object):
         """
         The frequency of the GR precession
         """
-        return self.nu_r(a)*3*(self.rg/a)/j**2
+        return self.gr_factor*self.nu_r(a)*3*(self.rg/a)/j**2
 
     def nu_p(self, a, j):
         """
@@ -158,7 +159,8 @@ class Cusp(object):
         The below which nup is only positive,
         that is nup(a,j=1) = 0
         """
-        return ((6/(3-self.gamma)*self.Q/self.Nh*self.rg/self.rh) **
+        return ((self.gr_factor *
+                 6/(3-self.gamma)*self.Q/self.Nh*self.rg/self.rh) **
                 (1/(4-self.gamma)) *
                 self.rh)
 

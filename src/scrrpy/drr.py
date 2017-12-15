@@ -14,6 +14,7 @@ import h5py
 
 import functools
 import multiprocessing as mp
+from ast import literal_eval as make_tuple
 
 from .cusp import Cusp
 
@@ -36,8 +37,7 @@ class DRR(Cusp):
         """
 
         # Default arguments
-        kwargs = {**dict(l_max=1,
-                         gamma=1.75,
+        kwargs = {**dict(gamma=1.75,
                          mbh=4e6,
                          mstar=1,
                          Njs=201,
@@ -55,7 +55,6 @@ class DRR(Cusp):
         self.j = np.logspace(np.log10(self.jlc(self.sma)), 0,
                              kwargs['Njs'])[:-1]
         self.omega = abs(self.nu_p(self.sma, self.j))
-        self.l_max = kwargs['l_max']
 
     @lru_cache()
     def _res_intrp(self, ratio):
@@ -68,6 +67,9 @@ class DRR(Cusp):
                              true_anomaly))
 
     def drr(self, l_max, neval=1e3, threads=1, tol=0.0):
+        """
+        Returns the RR diffusion coefficient over Jc^2 in 1/yr.
+        """
         lnnp = [(l, n, n_p)
                for l in range(1, l_max + 1)
                for n in range(1, l+1)
@@ -112,7 +114,7 @@ class DRR(Cusp):
             queue = mp.Queue()
             def parallel_drr(pos, seed, j, omega):
                 np.random.seed(seed)
-                results = [self._drr(j, omega, [l, n, n_p], neval=neval,
+                results = [self._drr(j, omega, (l, n, n_p), neval=neval,
                                      tol=tol)
                            for j, omega in zip(j, omega)]
                 drr = [result[0] for result in results]
@@ -140,19 +142,9 @@ class DRR(Cusp):
                                       for result in results])[resort]
 
         else:
-            widgets = ['{}, {}, {}'.format(l, n, n_p), ' ',
-                       progressbar.Percentage(),
-                       ' (', progressbar.SimpleProgress(), ')', ' ',
-                       progressbar.Bar(), ' ',
-                       progressbar.Timer(), ' ',
-                       progressbar.AdaptiveETA()]
-
-            pbar = progressbar.ProgressBar(widgets=widgets)
-
-
-            results = [self._drr(j, omega, [l, n, n_p], neval=neval, tol=tol)
+            results = [self._drr(j, omega, (l, n, n_p), neval=neval, tol=tol)
                        for j, omega, i in zip(self.j, self.omega,
-                                              pbar(range(self.j.size)))]
+                                              range(self.j.size))]
 
             drr = np.array([result[0] for result in results])
             drr_err = np.array([result[-1] for result in results])
@@ -228,7 +220,7 @@ class DRR(Cusp):
             return res
         return 4*np.pi*(np.array(integrate(Clnnp, integ, neval, tol)) *
                         _A2_norm_factor(*lnnp)*lnnp[1]**2 *
-                        self.nu_r(self.sma)**2/self.Q)
+                        self.nu_r(self.sma)**2/self.Q**2*self.Nh)
 
     def _tau2(self, j, lnnp, neval=1e3):
         if np.mod(lnnp[0] + lnnp[1], 2) or np.mod(lnnp[0] + lnnp[-1], 2):
@@ -264,6 +256,29 @@ class DRR(Cusp):
         return symmetry_factor*(np.array(integrate(Clnnp, integ, neval)) *
                                 _A2_norm_factor(*lnnp)*lnnp[1]**2)/j2/sma**2
 
+    @property
+    def l_max(self):
+        try:
+            return max([make_tuple(key)[0]
+                        for key in self._drr_lnnp_cache.keys()])
+        except AttributeError:
+            pass
+
+    @property
+    def neval(self):
+        try:
+            return max([make_tuple(key)[-2]
+                        for key in self._drr_lnnp_cache.keys()])
+        except AttributeError:
+            pass
+
+    @property
+    def tol(self):
+        try:
+            return min([make_tuple(key)[-1]
+                        for key in self._drr_lnnp_cache.keys()])
+        except AttributeError:
+            pass
 
     def save(self, file_name):
         """

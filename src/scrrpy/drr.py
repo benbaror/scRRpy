@@ -411,8 +411,9 @@ class ResInterp(object):
         if abs(self.omega[i]-omega) > 1e-8:
             raise ValueError
         j = self._j1[:, i]
-        if sum(j > 0):
-            return np.interp(af, self._af[j > 0], j[j > 0], left=0, right=0)
+        ix = np.where(j>0)[0]
+        if len(ix)>0:
+            return np.interp(af, self._af[ix], j[ix], left=0, right=0)
         else:
             return af*0.0
 
@@ -421,8 +422,9 @@ class ResInterp(object):
         if abs(self.omega[i]-omega) > 1e-8:
             raise ValueError
         j = self._j2[:, i]
-        if sum(j > 0):
-            return np.interp(af, self._af[j > 0], j[j > 0], left=0, right=0)
+        ix = np.where(j>0)[0]
+        if len(ix)>0:
+            return np.interp(af, self._af[ix], j[ix], left=0, right=0)
         else:
             return af*0.0
 

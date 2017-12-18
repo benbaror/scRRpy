@@ -282,7 +282,7 @@ class DRR(Cusp):
 
     def save(self, file_name):
         """
-        Save the cached data to an hdf5 file so it can be read latter.
+        Save the cached data to an hdf5 file so it can be read later.
         """
         with h5py.File(file_name,'w') as h5:
             drr_lnnp_cache = h5.create_group("_drr_lnnp_cache")
@@ -322,7 +322,7 @@ def integrate(func, integ, neval=1e4, tol=0.0):
 
 def A2_integrand(sma, j, sma_p, j_p, l, n, n_p, true_anomaly):
     """
-    returns the |alnnp|^2 integrand to use the the MC integration
+    returns the |alnnp|^2 integrand to use in the MC integration
     """
     cnnp = np.cos(true_anomaly.T*np.array([n, n, n_p, n_p])).T
     cnnp = cnnp[0]*cnnp[1]*cnnp[2]*cnnp[3]

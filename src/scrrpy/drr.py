@@ -66,7 +66,7 @@ class DRR(Cusp):
                              lnnp[0], lnnp[1], lnnp[-1],
                              true_anomaly))
 
-    def drr(self, l_max, neval=1e3, threads=1, tol=0.0):
+    def drr(self, l_max, neval=1e3, threads=1, tol=0.0, progress_bar=False):
         """
         Returns the RR diffusion coefficient over Jc^2 in 1/yr.
         """
@@ -76,7 +76,11 @@ class DRR(Cusp):
                for n_p in range(1, l+1)
                if not mod(l+n, 2)+mod(l+n_p, 2)]
 
-        pbar = progressbar.ProgressBar()(range(len(lnnp)))
+        if progress_bar:
+            pbar = progressbar.ProgressBar()(range(len(lnnp)))
+        else:
+            pbar = range(len(lnnp))
+
 
         for i in pbar:
             self._drr_lnnp(*lnnp[i], neval=neval, threads=threads, tol=tol)

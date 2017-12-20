@@ -16,7 +16,7 @@ Why does this file exist, and why not put this in __main__?
 """
 
 import click
-import matplotlib.pyplot as plt
+import numpy as np
 from .drr import DRR
 
 @click.command()
@@ -30,11 +30,17 @@ from .drr import DRR
 @click.option('--threads', default=1)
 @click.option('--neval', default=1e4)
 @click.option('--plot', is_flag=True)
-def main(name, sma, l_max, gamma, mstar, mbh, rh, threads, neval, plot):
+@click.option('--no_pbar', is_flag=True)
+def main(name, sma, l_max, gamma, mstar, mbh, rh, threads, neval, plot,
+         no_pbar):
+
     drr = DRR(sma, gamma=gamma, mbh=mbh, mstar= mstar, rh=rh)
-    Drr, Drr_err =  drr.drr(l_max, threads=threads, tol=0.0, neval=neval)
+
+    Drr, Drr_err =  drr.drr(l_max, threads=threads, tol=0.0, neval=neval,
+                            progress_bar=~no_pbar)
     drr.save(name + '.hdf5')
     if plot:
+        import matplotlib.pyplot as plt
         plt.errorbar(drr.j, Drr, Drr_err, fmt='o')
         plt.xscale('log')
         plt.yscale('log')

@@ -338,6 +338,16 @@ class DRR(Cusp):
                 if key != '_drr_lnnp_cache':
                     setattr(self, key, value.value)
 
+    def from_file(self, file_name):
+        """Load from file and return an instance
+
+        example:
+        drr = DRR(1.0).from_file(file_name)
+        """
+        self.read(file_name)
+        return self
+
+
 def integrate(func, integ, neval=1e4, tol=0.0):
     n = neval
     integ.set(rtol=tol)

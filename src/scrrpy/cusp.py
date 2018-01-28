@@ -3,7 +3,9 @@ import numpy as np
 from astropy import constants
 from numpy import pi
 from scipy.special import eval_legendre
-
+from functools import partial
+from numba import jit
+from numba.errors import TypingError
 G = constants.G
 M0 = constants.M_sun
 C = constants.c
@@ -103,21 +105,19 @@ class Cusp(object):
         For any \gamma
         g(1) = (3-\gamma)/2
         """
-        P1 = eval_legendre(1 - self.gamma, 1/j)
-        P2 = eval_legendre(2 - self.gamma, 1/j)
-        return - j**(4 - self.gamma)/(1-j**2)*(P1 - P2/j)
+        j = np.asarray(j, dtype=np.float64)
+        P1 = self.eval_legendre_inv(1 - self.gamma, j)
+        P2 = self.eval_legendre_inv(2 - self.gamma, j)
+        return  - j**(4 - self.gamma)/(1-j**2)*(P1 - P2/j)
 
     def _gp(self, j):
         """
         dg(j)/dj
         """
-        P1 = eval_legendre(1 - self.gamma, 1/j)
-        P2 = eval_legendre(2 - self.gamma, 1/j)
-        P3 = eval_legendre(3 - self.gamma, 1/j)
-        return -(j**(2 - self.gamma)/(1-j**2)**2 *
-                 (j*(6-2*self.gamma + (self.gamma - 2)*j**2)*P1 +
-                  (2*self.gamma-6-j**2)*P2 -
-                  (self.gamma-3)*j*P3))
+        n2 = 2 - self.gamma
+        P1 = self.eval_legendre_inv(1 - self.gamma, j)
+        P2 = self.eval_legendre_inv(2 - self.gamma, j)
+        return gp(j, P1, P2, n2)
 
     def nu_gr(self, a, j):
         """
@@ -141,7 +141,10 @@ class Cusp(object):
         """
         The derivative of \nu_p with respect to j defined to be positive
         """
-        return (2*self.nu_gr(a, j)/j - self._nu_mass0(a)*self._gp(j))
+        d_nu_gr = 6*self.gr_factor*(self.rg/a)/(j*j*j)
+        gp = self._gp(j)
+        d_nu_mass = -self.Mstars(a)/self.mbh*gp
+        return (d_nu_gr - d_nu_mass)*self.nu_r(a)
 
     def nu_mass_inv(self, j, omega):
         """
@@ -169,3 +172,47 @@ class Cusp(object):
         Relativistic loss cone
         """
         return 4*np.sqrt(self.rg/a)
+
+    def eval_legendre_inv(self, n, j):
+        try:
+            return self._eval_legendre_inv[n](j)
+        except (AttributeError, KeyError, TypingError) as err:
+            if type(err) is TypingError:
+                return self._eval_legendre_inv[n](np.atleast_1d(j))[0]
+            if type(err) is AttributeError:
+                self._eval_legendre_inv = {}
+            j_samp = np.logspace(np.log10(self.jlc(self.rh)), 0, 1000)
+            Pn = eval_legendre(n, 1/j_samp)
+            x0 = np.log(j_samp[0])
+            dx_inv =  1/(np.log(j_samp[1]) - x0)
+            self._eval_legendre_inv[n] = partial(interp_loglog, x0=x0,
+                                                 dx_inv=dx_inv,
+                                                 logf=np.log(Pn))
+            return self._eval_legendre_inv[n](j)
+
+
+@jit(nopython=True)
+def interp_semilogx(x_int, x0, dx_inv, f):
+    f_int = np.empty_like(x_int)
+    for i in range(x_int.size):
+        x_dx = (np.log(x_int[i])-x0)*dx_inv
+        ind = int(x_dx)
+        w = x_dx - ind
+        f_int[i] = f[ind]*(1-w) + f[ind+1]*w
+    return f_int
+
+@jit(nopython=True)
+def interp_loglog(x_int, x0, dx_inv, logf):
+    f_int = np.empty_like(x_int)
+    for i in range(x_int.size):
+        x_dx = (np.log(x_int[i])-x0)*dx_inv
+        ind = int(x_dx)
+        w = x_dx - ind
+        f_int[i] = logf[ind]*(1-w) + logf[ind+1]*w
+    return np.exp(f_int)
+
+
+@jit(nopython=True)
+def gp(j, P1, P2, n2):
+    return (j**n2 / (1 - j**2)**2 *
+            ((j**2 + 1)*P2 - j*(2 + n2*(1 - j**2))*P1))

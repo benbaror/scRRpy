@@ -16,6 +16,8 @@ import functools
 import multiprocessing as mp
 from ast import literal_eval as make_tuple
 
+from numba import jit
+
 from .cusp import Cusp
 
 
@@ -61,12 +63,11 @@ class DRR(Cusp):
         return ResInterp(self, self.omega*ratio, self.gr_factor)
 
     def _integrand(self, j, sma_p, j_p, lnnp, true_anomaly):
-        return (2*j_p/abs(self.d_nu_p(sma_p, j_p))/lnnp[-1] *
-                A2_integrand(self.sma, j, sma_p, j_p,
-                             lnnp[0], lnnp[1], lnnp[-1],
-                             true_anomaly))
+        d_nu_p = abs(self.d_nu_p(sma_p, j_p))
+        A2_int = A2_integrand(self.sma, j, sma_p, j_p, lnnp, true_anomaly)
+        return (2 * j_p * A2_int / d_nu_p / lnnp[-1])
 
-    def drr(self, l_max, neval=1e3, threads=1, tol=0.0, progress_bar=False):
+    def drr(self, l_max, neval=1e3, threads=1, tol=0.0, progress_bar=True):
         """
         Returns the RR diffusion coefficient over Jc^2 in 1/yr.
         """
@@ -205,24 +206,47 @@ class DRR(Cusp):
         return tau2, tau2_err
 
     def _drr(self, j, omega, lnnp, neval=1e3, tol=0.0):
-        integ = vegas.Integrator(5 * [[0, 1]])
         ratio = lnnp[1]/lnnp[-1]
+        get_jf1 = self._res_intrp(ratio).get_jf1(omega*ratio)
+        get_jf2 = self._res_intrp(ratio).get_jf2(omega*ratio)
 
         @vegas.batchintegrand
-        def Clnnp(x):
+        def Clnnp1(x):
             true_anomaly = x[:, :-1].T*np.pi
             sma_f = self.inverse_cumulative_a(x[:, -1])
-            jf1 = self._res_intrp(ratio).get_jf1(omega*ratio, sma_f)
-            jf2 = self._res_intrp(ratio).get_jf2(omega*ratio, sma_f)
-            res = np.zeros((x.shape[0], 2), float)
-            ix1 = jf1 > 0
-            ix2 = jf2 > 0
-            res[ix1, 0] = self._integrand(j, sma_f[ix1], jf1[ix1], lnnp,
-                                          true_anomaly[:, ix1])
-            res[ix2, 1] = self._integrand(j, sma_f[ix2], jf2[ix2], lnnp,
-                                          true_anomaly[:, ix2])
+            jf1 = get_jf1(sma_f)
+            res = np.zeros(x.shape[0], float)
+            ix1 = np.where(jf1 > 0)[0]
+            if len(ix1)>0:
+                res[ix1] = self._integrand(j, sma_f[ix1], jf1[ix1], lnnp,
+                                           true_anomaly[:, ix1])
             return res
-        return 4*np.pi*(np.array(integrate(Clnnp, integ, neval, tol)) *
+
+        @vegas.batchintegrand
+        def Clnnp2(x):
+            true_anomaly = x[:, :-1].T*np.pi
+            sma_f = self.inverse_cumulative_a(x[:, -1])
+            jf2 = get_jf2(sma_f)
+            res = np.zeros(x.shape[0], float)
+            ix2 = np.where(jf2 > 0)[0]
+            if len(ix2)>0:
+                res[ix2] = self._integrand(j, sma_f[ix2], jf2[ix2], lnnp,
+                                           true_anomaly[:, ix2])
+            return res
+
+        integ = vegas.Integrator(5 * [[0, 1]])
+
+        if get_jf1 is None:
+            int1, err1 = 0.0, 0.0
+        else:
+            int1, err1 = np.array(integrate(Clnnp1, integ, neval, tol))
+
+        if get_jf2 is None:
+            int2, err2 = 0.0, 0.0
+        else:
+            int2, err2 = np.array(integrate(Clnnp2, integ, neval, tol))
+
+        return 4*np.pi*(np.array([[int1, int2], [err1, err2]]) *
                         _A2_norm_factor(*lnnp)*lnnp[1]**2 *
                         self.nu_r(self.sma)**2/self.Q**2*self.Nh)
 
@@ -293,8 +317,10 @@ class DRR(Cusp):
             for key, value in self._drr_lnnp_cache.items():
                 drr_lnnp_cache[key] = value
             for key, value in self.__dict__.items():
-                if key != '_drr_lnnp_cache':
+                try:
                     h5[key] = value
+                except TypeError:
+                    pass
 
     def read(self, file_name):
         """
@@ -324,18 +350,22 @@ def integrate(func, integ, neval=1e4, tol=0.0):
     return res, err
 
 
-def A2_integrand(sma, j, sma_p, j_p, l, n, n_p, true_anomaly):
+@jit(nopython=True)
+def A2_integrand(sma, j, sma_p, j_p, lnnp, true_anomaly):
     """
     returns the |alnnp|^2 integrand to use the the MC integration
     """
+    l, n, n_p = lnnp
     cnnp = np.cos(true_anomaly.T*np.array([n, n, n_p, n_p])).T
     cnnp = cnnp[0]*cnnp[1]*cnnp[2]*cnnp[3]
-    ecc, eccp = np.sqrt(1-j**2), np.sqrt(1-j_p**2)
-    r12 = (sma*(1-ecc**2)/(1-ecc*np.cos(true_anomaly[:2])))
-    rp12 = (sma_p*(1-eccp**2)/(1-eccp*np.cos(true_anomaly[2:])))
+    j2 = j**2
+    j_p2 = j_p**2
+    ecc, eccp = np.sqrt(1-j2), np.sqrt(1-j_p2)
+    r12 = (sma*j2/(1-ecc*np.cos(true_anomaly[:2])))
+    rp12 = (sma_p*j_p2/(1-eccp*np.cos(true_anomaly[2:])))
     r_1, r_2 = r12[0], r12[-1]
     rp1, rp2 = rp12[0], rp12[-1]
-    return (cnnp/j**2/j_p**2/sma**2/sma_p**4 *
+    return (cnnp/j2/j_p2/sma**2/sma_p**4 *
             (np.minimum(r_1, rp1)*np.minimum(r_2, rp2))**(2*l+1) /
             (r_1*r_2*rp1*rp2)**(l-1))
 
@@ -410,27 +440,26 @@ class ResInterp(object):
             if any(nup < 0):
                 self._j2[i+last, :] = get_j(-nup)
 
-    def get_jf1(self, omega, af):
+    def get_jf1(self, omega):
         i = np.argmin(abs(self.omega-omega))
         if abs(self.omega[i]-omega) > 1e-8:
             raise ValueError
         j = self._j1[:, i]
         ix = np.where(j>0)[0]
         if len(ix)>0:
-            return np.interp(af, self._af[ix], j[ix], left=0, right=0)
-        else:
-            return af*0.0
+            return lambda af: np.interp(af,
+                                        self._af[ix], j[ix], left=0, right=0)
 
-    def get_jf2(self, omega, af):
+    def get_jf2(self, omega):
         i = np.argmin(abs(self.omega-omega))
         if abs(self.omega[i]-omega) > 1e-8:
             raise ValueError
         j = self._j2[:, i]
         ix = np.where(j>0)[0]
         if len(ix)>0:
-            return np.interp(af, self._af[ix], j[ix], left=0, right=0)
-        else:
-            return af*0.0
+            return lambda af: np.interp(af,
+                                        self._af[ix], j[ix], left=0, right=0)
+
 
 
 def get_drr(drr, neval, lnnp):

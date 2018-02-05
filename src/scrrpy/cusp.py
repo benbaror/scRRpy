@@ -159,7 +159,7 @@ class Cusp(object):
     @property
     def a_gr1(self):
         """
-        The below which nup is only positive,
+        The sma below which nup is only positive,
         that is nup(a,j=1) = 0
         """
         return ((self.gr_factor *

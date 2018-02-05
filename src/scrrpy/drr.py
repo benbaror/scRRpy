@@ -86,9 +86,16 @@ class DRR(Cusp):
         for i in pbar:
             self._drr_lnnp(*lnnp[i], neval=neval, threads=threads, tol=tol)
 
-        drr = sum((self._drr_lnnp(*lnnp, neval=neval, threads=threads,
+        drr = np.vstack([self._drr_lnnp(*lnnp, neval=neval, threads=threads,
                                   tol=tol)[0]
-                   for lnnp in  lnnp))
+                   for lnnp in  lnnp])
+
+        # Remove non-physical values
+        drr[drr < 0] = 0
+
+        # sum all resonances
+        drr = drr.sum(axis=0)
+
         drr_err = sqrt(sum(self._drr_lnnp(*lnnp, neval=neval,
                                           threads=threads,
                                           tol=tol)[-1]**2

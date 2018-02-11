@@ -1,98 +1,250 @@
 """Properties of the stellar cusp"""
+
 import numpy as np
-from astropy import constants
+# noinspection PyUnresolvedReferences
+from astropy.constants import G
+from astropy.constants import M_sun
+from astropy.constants import c
+# from functools import partial
+from numba import jit
 from numpy import pi
 from scipy.special import eval_legendre
-from functools import partial
-from numba import jit
-from numba.errors import TypingError
-G = constants.G
-M0 = constants.M_sun
-C = constants.c
-RG0 = (G*M0/C**2).to('pc').value
-TG0 = (G*M0/C**3).to('year').value
+
+# from numba.errors import TypingError
+
+M0 = M_sun
+# Define physical constants
+# Gravitational radius of a solar mass black hole
+RG0 = (G*M_sun/c**2).to('pc').value
+# Light crossing time of solar mass black hole
+TG0 = (G*M_sun/c**3).to('year').value
 
 
+# noinspection PyCompatibility
 class Cusp(object):
     """
+    A power law stellar cusp around a massive black hole (MBH).
+    The cusp is assumed to have an isotropic distribution function :math:`f(E) \propto |E|^p`
+    corresponding ro a stellar density :math:`n(r) \propto r^{-\gamma}` where :math:`\gamma = 3/2 + p`
+
+    Parameters
+    ----------
+    gamma : float, int, optional
+        The slope of the density profile.
+        default: 7/4 (Bahcall wolf cusp)
+    mbh_mass : float, int
+        Mass of the MBH [solar mass].
+        default: 4.3 10^6 (Milky Way MBH)
+    star_mass : float, int
+        Mass of individual stars [solar mass].
+        default: 1.0
+    rh : float, int
+        Radius of influence [pc].
+        Define as the radius in which the velocity
+        dispersion of the stellar cusp :math:`\sigma` is equal to the
+        Keplerian velocity due to the MBH :math:`\sigma(r_h)^2 = G M_\bullet / r_h`.
+        default: 2.0
+
+    TODO: Implement normalization Total mass at r_H
+    TODO: Implement normalization N(a) vs N(r)
     """
 
-    def __init__(self, gamma=1.75, mbh=4e6, mstar=1, rh=2):
+    def __init__(self, gamma: float=1.75, mbh_mass: float=4e6,
+                 star_mass: float=1.0, rh: float=2.0) -> None:
         """
         """
-        self.gamma = gamma
-        self.mbh = mbh
-        self.mstar = mstar
-        self.rh = rh
+        self.gamma = float(gamma)
+        self.mbh_mass = float(mbh_mass)
+        self.star_mass = float(star_mass)
+        self.rh = float(rh)
         self.gr_factor = 1.0
 
     @property
-    def rg(self):
+    def rg(self) -> float:
         """
-        Gravitational rads in pc
+        Gravitational radius of the MBH [pc]
         """
-        return RG0*self.mbh
+        return RG0*self.mbh_mass
 
     @property
-    def tg(self, ):
+    def tg(self) -> float:
         """
-        Gravitational time
+        Light crossing time of the MBH [sec]
         """
-        return TG0*self.mbh
+        return TG0*self.mbh_mass
+
+    def jlc(self, a):
+        """
+        Relativistic loss cone:
+          Minimal normalized angular momentum on which orbits are stable.
+
+          :math:`j_{lc} = J_{lc} / J_c`,
+          where :math:`J_{lc} = 4GM_\bullat/c` is the last stable orbit in the parabolic limit
+          and :math:`J_c = \sqrt{GM_\bullet a}` is the maximal (circular) stable orbit.
+
+          This is an approximation which works when the orbital binding energy `E` is much smaller than
+          rest energy of the MBH `Mc^2`.
+
+        Parameters
+        ----------
+        a: float, array
+            Semi-major axis [pc].
+        """
+        return 4 * np.sqrt(self.rg / a)
 
     @property
-    def Q(self):
+    def mass_ratio(self) -> float:
         """
+        MBH to star mass ratio
         """
-        return self.mbh/self.mstar
+        return self.mbh_mass / self.star_mass
 
     @property
-    def Nh(self):
+    def total_number_of_stars(self) -> float:
         """
+        Number of stars within the radius of influence `rh`
         """
-        return self.Q
+        return self.total_stellar_mass / self.star_mass
 
-    def Nstars(self, a):
+    @property
+    def total_stellar_mass(self) -> float:
         """
-        The number of stars within a[pc]
-        """
-        return self.Nh*(a/self.rh)**(3-self.gamma)
+        Total mass within the radius of influence `rh` [solar mass]
 
-    def Mstars(self, a):
+        TODO: Implement normalization
         """
-        The number of stars within a[pc]
-        """
-        return self.mbh*(a/self.rh)**(3-self.gamma)
+        return self.mass_ratio
 
-    def dMda(self, a):
+    def number_of_stars(self, a: float) -> float:
         """
-        dM/da at a[pc]
-        """
-        return (3-self.gamma)*self.mbh*(a/self.rh)**(3-self.gamma)/a
+        Number of stars with semi-major axis smaller than a[pc]
 
-    def period(self, a):
+        Parameters
+        ----------
+        a: float, array
+            Semi-major axis [pc].
+        """
+        return self.total_number_of_stars * (a / self.rh) ** (3 - self.gamma)
+
+    def stellar_mass(self, a: float) -> float:
+        """
+        Enclosed mass within r = a[pc].
+        TODO: check M(r) vs M(a)
+
+        Parameters
+        ----------
+        a: float, array
+            Semi-major axis [pc].
+        """
+        return self.total_stellar_mass * (a / self.rh) ** (3 - self.gamma)
+
+    def period(self, a: float) -> float:
         """
         The orbital period in years at a[pc]
+
+        Parameters
+        ----------
+        a: float, array
+            Semi-major axis [pc].
         """
         return 2*pi/self.nu_r(a)
 
-    def nu_r(self, a):
+    def nu_r(self, a: float) -> float:
         """
         The orbital frequency in rad/year at a[pc]
-        """
-        return (self.rg/a)**(1.5)/self.tg
 
-    def nu_mass(self, a, j):
+        Parameters
+        ----------
+        a: float, array
+            Semi-major axis [pc].
         """
-        The frequency of the mass precession
+        return (self.rg/a)**1.5/self.tg
+
+    def nu_mass(self, a: float, j: float) -> float:
+        """
+        Precession frequency [rad/year] due to stellar mass.
+
+        Parameters
+        ----------
+        a: float, array
+            Semi-major axis [pc].
+        j: float, array
+            Normalized angular momentum :math:`j = J/J_c = \sqrt{1-e^2}`.
         """
         return self._nu_mass0(a)*self._g(j)
 
+    def nu_gr(self, a, j):
+        """
+        Precession frequency [rad/year] due to general relativity (first PN term)
+
+        Parameters
+        ----------
+        a: float, array
+            Semi-major axis [pc].
+        j: float, array
+            Normalized angular momentum :math:`j = J/J_c = \sqrt{1-e^2}`.
+        """
+        return self.gr_factor*self.nu_r(a)*3*(self.rg/a)/j**2
+
+    def nu_p(self, a, j):
+        """
+        Precession frequency [rad/year].
+           `nu_p(a, j) = nu_gr(a, j) + nu_mass(a, j)`
+
+        Parameters
+        ----------
+        a: float, array
+            Semi-major axis [pc].
+        j: float, array
+            Normalized angular momentum :math:`j = J/J_c = \sqrt{1-e^2}`.
+        """
+        return self.nu_gr(a, j) + self.nu_mass(a, j)
+
+    def nu_p1(self, a):
+        """
+        Precession frequency at j=1
+        """
+        return self.nu_gr(a, 1.0) + self._nu_mass0(a)*(3-self.gamma)/2
+
+    def d_nu_p(self, a, j):
+        """
+        The derivative of nu_p with respect to j, defined to be positive
+        """
+        d_nu_gr = 6*self.gr_factor*(self.rg/a)/(j*j*j)
+        d_nu_mass = -self.stellar_mass(a) / self.mbh_mass * self._gp(j)
+        return (d_nu_gr - d_nu_mass)*self.nu_r(a)
+
+    def nu_mass_inv(self, j, omega):
+        """
+        Return `a` such that `nu_mass(a,j) = omega`
+        """
+        nu_mass_rh = abs(self.nu_mass(self.rh, j))
+        return (omega/nu_mass_rh)**(1/(3/2-self.gamma))*self.rh
+
+    def inverse_cumulative_a(self, x):
+        """
+        The inverse of N(a). Useful to generate a random sample of semi-major axis
+
+        Parameters
+        ----------
+        x: float, array
+          x in [0, 1]
+
+        Example
+        -------
+        >>> cusp = Cusp(gamma=1.75)
+        >>> np.random.seed(1234)
+        >>> sma = cusp.inverse_cumulative_a(np.random.rand(100))
+        >>> print(sma.min(), sma.mean(), sma.max())
+        0.0343099647817 1.14741823174 1.98732028148
+        """
+        return x**(1/(3-self.gamma))*self.rh
+
     def _nu_mass0(self, a):
         """
-        The frequency of the mass precession divided by g(j)
+        The frequency of the mass precession divided by g(j).
         """
-        return -self.nu_r(a)*self.Mstars(a)/self.mbh
+        return -self.nu_r(a) * self.stellar_mass(a) / self.mbh_mass
 
     def _g(self, j):
         """
@@ -105,56 +257,18 @@ class Cusp(object):
         For any \gamma
         g(1) = (3-\gamma)/2
         """
-        j = np.asarray(j, dtype=np.float64)
-        P1 = self.eval_legendre_inv(1 - self.gamma, j)
-        P2 = self.eval_legendre_inv(2 - self.gamma, j)
-        return  - j**(4 - self.gamma)/(1-j**2)*(P1 - P2/j)
+        p1 = self._eval_legendre_inv(1 - self.gamma, j)
+        p2 = self._eval_legendre_inv(2 - self.gamma, j)
+        return - j**(4 - self.gamma)/(1-j**2)*(p1 - p2/j)
 
     def _gp(self, j):
         """
         dg(j)/dj
         """
         n2 = 2 - self.gamma
-        P1 = self.eval_legendre_inv(1 - self.gamma, j)
-        P2 = self.eval_legendre_inv(2 - self.gamma, j)
-        return gp(j, P1, P2, n2)
-
-    def nu_gr(self, a, j):
-        """
-        The frequency of the GR precession
-        """
-        return self.gr_factor*self.nu_r(a)*3*(self.rg/a)/j**2
-
-    def nu_p(self, a, j):
-        """
-        The frequency of the precession
-        """
-        return self.nu_gr(a, j) + self.nu_mass(a, j)
-
-    def nu_p1(self, a):
-        """
-        The frequency of the precession at j=1
-        """
-        return self.nu_gr(a, 1.0) + self._nu_mass0(a)*(3-self.gamma)/2
-
-    def d_nu_p(self, a, j):
-        """
-        The derivative of \nu_p with respect to j defined to be positive
-        """
-        d_nu_gr = 6*self.gr_factor*(self.rg/a)/(j*j*j)
-        gp = self._gp(j)
-        d_nu_mass = -self.Mstars(a)/self.mbh*gp
-        return (d_nu_gr - d_nu_mass)*self.nu_r(a)
-
-    def nu_mass_inv(self, j, omega):
-        """
-        Return a such that nu_mass(a,j) = omega
-        """
-        nu_mass_rh = abs(self.nu_mass(self.rh, j))
-        return (omega/nu_mass_rh)**(1/(3/2-self.gamma))*self.rh
-
-    def inverse_cumulative_a(self, r):
-        return r**(1/(3-self.gamma))*self.rh
+        p1 = self._eval_legendre_inv(1 - self.gamma, j)
+        p2 = self._eval_legendre_inv(2 - self.gamma, j)
+        return gp(j, p1, p2, n2)
 
     @property
     def a_gr1(self):
@@ -163,32 +277,30 @@ class Cusp(object):
         that is nup(a,j=1) = 0
         """
         return ((self.gr_factor *
-                 6/(3-self.gamma)*self.Q/self.Nh*self.rg/self.rh) **
+                 6 / (3-self.gamma) * self.mass_ratio / self.total_number_of_stars * self.rg / self.rh) **
                 (1/(4-self.gamma)) *
                 self.rh)
 
-    def jlc(self, a):
-        """
-        Relativistic loss cone
-        """
-        return 4*np.sqrt(self.rg/a)
+    @staticmethod
+    def _eval_legendre_inv(n, j):
+        return eval_legendre(n, 1/j)
 
-    def eval_legendre_inv(self, n, j):
-        try:
-            return self._eval_legendre_inv[n](j)
-        except (AttributeError, KeyError, TypingError) as err:
-            if type(err) is TypingError:
-                return self._eval_legendre_inv[n](np.atleast_1d(j))[0]
-            if type(err) is AttributeError:
-                self._eval_legendre_inv = {}
-            j_samp = np.logspace(np.log10(self.jlc(self.rh)), 0, 1000)
-            Pn = eval_legendre(n, 1/j_samp)
-            x0 = np.log(j_samp[0])
-            dx_inv =  1/(np.log(j_samp[1]) - x0)
-            self._eval_legendre_inv[n] = partial(interp_loglog, x0=x0,
-                                                 dx_inv=dx_inv,
-                                                 logf=np.log(Pn))
-            return self._eval_legendre_inv[n](j)
+    # def _eval_legendre_inv_int(self, n, j):
+    #     try:
+    #         return self._eval_legendre_inv[n](j)
+    #     except (AttributeError, KeyError, TypingError) as err:
+    #         if type(err) is TypingError:
+    #             return self._eval_legendre_inv[n](np.atleast_1d(j))[0]
+    #         if type(err) is AttributeError:
+    #             self._eval_legendre_inv = {}
+    #         j_samp = np.logspace(np.log10(self.jlc(self.rh)), 0, 1000)
+    #         pn = eval_legendre(n, 1/j_samp)
+    #         x0 = np.log(j_samp[0])
+    #         dx_inv = 1/(np.log(j_samp[1]) - x0)
+    #         self._eval_legendre_inv[n] = partial(interp_loglog, x0=x0,
+    #                                              dx_inv=dx_inv,
+    #                                              logf=np.log(pn))
+    #         return self._eval_legendre_inv[n](j)
 
 
 @jit(nopython=True)
@@ -201,11 +313,12 @@ def interp_semilogx(x_int, x0, dx_inv, f):
         f_int[i] = f[ind]*(1-w) + f[ind+1]*w
     return f_int
 
+
 @jit(nopython=True)
 def interp_loglog(x_int, x0, dx_inv, logf):
     f_int = np.empty_like(x_int)
-    for i in range(x_int.size):
-        x_dx = (np.log(x_int[i])-x0)*dx_inv
+    for i, x in enumerate(x_int):
+        x_dx = (np.log(x)-x0)*dx_inv
         ind = int(x_dx)
         w = x_dx - ind
         f_int[i] = logf[ind]*(1-w) + logf[ind+1]*w
@@ -213,6 +326,6 @@ def interp_loglog(x_int, x0, dx_inv, logf):
 
 
 @jit(nopython=True)
-def gp(j, P1, P2, n2):
+def gp(j, p1, p2, n2):
     return (j**n2 / (1 - j**2)**2 *
-            ((j**2 + 1)*P2 - j*(2 + n2*(1 - j**2))*P1))
+            ((j**2 + 1)*p2 - j*(2 + n2*(1 - j**2))*p1))

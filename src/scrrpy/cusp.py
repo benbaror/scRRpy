@@ -2,6 +2,8 @@
 
 import numpy as np
 # noinspection PyUnresolvedReferences
+# noinspection PyUnresolvedReferences
+# noinspection PyUnresolvedReferences
 from astropy.constants import G
 from astropy.constants import M_sun
 from astropy.constants import c
@@ -24,8 +26,9 @@ TG0 = (G*M_sun/c**3).to('year').value
 class Cusp(object):
     """
     A power law stellar cusp around a massive black hole (MBH).
-    The cusp is assumed to have an isotropic distribution function :math:`f(E) \propto |E|^p`
-    corresponding ro a stellar density :math:`n(r) \propto r^{-\gamma}` where :math:`\gamma = 3/2 + p`
+    The cusp is assumed to have an isotropic distribution function
+    :math:`f(E) \propto |E|^p` corresponding ro a stellar density
+    :math:`n(r) \propto r^{-\gamma}` where :math:`\gamma = 3/2 + p`
 
     Parameters
     ----------
@@ -42,7 +45,8 @@ class Cusp(object):
         Radius of influence [pc].
         Define as the radius in which the velocity
         dispersion of the stellar cusp :math:`\sigma` is equal to the
-        Keplerian velocity due to the MBH :math:`\sigma(r_h)^2 = G M_\bullet / r_h`.
+        Keplerian velocity due to the MBH
+        :math:`\sigma(r_h)^2 = G M_\bullet / r_h`.
         default: 2.0
 
     TODO: Implement normalization Total mass at r_H
@@ -79,11 +83,12 @@ class Cusp(object):
           Minimal normalized angular momentum on which orbits are stable.
 
           :math:`j_{lc} = J_{lc} / J_c`,
-          where :math:`J_{lc} = 4GM_\bullat/c` is the last stable orbit in the parabolic limit
-          and :math:`J_c = \sqrt{GM_\bullet a}` is the maximal (circular) stable orbit.
+          where :math:`J_{lc} = 4GM_\bullat/c` is the last stable orbit in the
+          parabolic limit and :math:`J_c = \sqrt{GM_\bullet a}` is the
+          maximal (circular) stable orbit.
 
-          This is an approximation which works when the orbital binding energy `E` is much smaller than
-          rest energy of the MBH `Mc^2`.
+          This is an approximation which works when the orbital binding energy
+          `E` is much smaller than rest energy of the MBH `Mc^2`.
 
         Parameters
         ----------
@@ -175,7 +180,8 @@ class Cusp(object):
 
     def nu_gr(self, a, j):
         """
-        Precession frequency [rad/year] due to general relativity (first PN term)
+        Precession frequency [rad/year] due to general relativity
+        (first PN term)
 
         Parameters
         ----------
@@ -223,7 +229,8 @@ class Cusp(object):
 
     def inverse_cumulative_a(self, x):
         """
-        The inverse of N(a). Useful to generate a random sample of semi-major axis
+        The inverse of N(a). Useful to generate a random
+        sample of semi-major axis.
 
         Parameters
         ----------
@@ -277,7 +284,8 @@ class Cusp(object):
         that is nup(a,j=1) = 0
         """
         return ((self.gr_factor *
-                 6 / (3-self.gamma) * self.mass_ratio / self.total_number_of_stars * self.rg / self.rh) **
+                 6 / (3-self.gamma) * self.mass_ratio /
+                 self.total_number_of_stars * self.rg / self.rh) **
                 (1/(4-self.gamma)) *
                 self.rh)
 

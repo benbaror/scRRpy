@@ -45,8 +45,8 @@ class DRR(Cusp):
                   **kwargs}
 
         super().__init__(gamma=kwargs['gamma'],
-                         mbh=kwargs['mbh'],
-                         mstar=kwargs['mstar'],
+                         mbh_mass=kwargs['mbh'],
+                         star_mass=kwargs['mstar'],
                          rh=kwargs['rh'])
 
         self.sma = sma
@@ -251,7 +251,7 @@ class DRR(Cusp):
 
         return 4 * np.pi * (np.array([[int1, int2], [err1, err2]]) *
                             _A2_norm_factor(*lnnp) * lnnp[1] ** 2 *
-                            self.nu_r(self.sma) ** 2 / self.Q ** 2 * self.Nh)
+                            self.nu_r(self.sma) ** 2 / self.mass_ratio ** 2 * self.total_number_of_stars)
 
     def _tau2(self, j, lnnp, neval=1e3):
         if np.mod(lnnp[0] + lnnp[1], 2) or np.mod(lnnp[0] + lnnp[-1], 2):
@@ -342,14 +342,14 @@ class DRR(Cusp):
                 if key != '_drr_lnnp_cache':
                     setattr(self, key, value.value)
 
-    def from_file(self, file_name):
+    @classmethod
+    def from_file(cls, file_name):
         """Load from file and return an instance
 
         example:
-        drr = DRR(1.0).from_file(file_name)
+        drr = DRR.from_file(file_name)
         """
-        self.read(file_name)
-        return self
+        return cls(1.0).read(file_name)
 
 
 def integrate(func, integ, neval=1e4, tol=0.0):

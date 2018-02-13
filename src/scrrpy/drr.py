@@ -2,11 +2,15 @@
 A module for calculating Resonant Relaxation diffusion coefficients
 """
 
-from __future__ import absolute_import, division, print_function
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import multiprocessing as mp
 from ast import literal_eval as make_tuple
-from builtins import range, super, zip
+from builtins import range
+from builtins import super
+from builtins import zip
 from functools import lru_cache
 
 import h5py

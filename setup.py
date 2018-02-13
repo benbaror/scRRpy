@@ -65,7 +65,7 @@ setup(
         # eg: 'keyword1', 'keyword2', 'keyword3',
     ],
     install_requires=[
-        'click', 'h5py', 'numpy', 'progressbar2', 'vegas', 'numba', 'numpy', 'scipy', 'astropy',
+        'click', 'h5py', 'numpy', 'progressbar2', 'vegas', 'numba', 'numpy', 'scipy', 'astropy', 'matplotlib',
     ],
     extras_require={
         # eg:

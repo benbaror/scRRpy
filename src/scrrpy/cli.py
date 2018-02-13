@@ -16,8 +16,9 @@ Why does this file exist, and why not put this in __main__?
 """
 
 import click
-import numpy as np
+
 from .drr import DRR
+
 
 @click.command()
 @click.argument('name')
@@ -33,15 +34,13 @@ from .drr import DRR
 @click.option('--no_pbar', is_flag=True)
 def main(name, sma, l_max, gamma, mstar, mbh, rh, threads, neval, plot,
          no_pbar):
+    drr = DRR(sma, gamma=gamma, mbh_mass=mbh, star_mass=mstar, rh=rh)
 
-    drr = DRR(sma, gamma=gamma, mbh=mbh, mstar= mstar, rh=rh)
-
-    Drr, Drr_err =  drr.drr(l_max, threads=threads, tol=0.0, neval=neval,
-                            progress_bar=~no_pbar)
+    d_rr, d_err = drr(l_max, threads=threads, tol=0.0, neval=neval, progress_bar=~no_pbar)
     drr.save(name + '.hdf5')
     if plot:
         import matplotlib.pyplot as plt
-        plt.errorbar(drr.j, Drr, Drr_err, fmt='o')
+        plt.errorbar(drr.j, d_rr, d_err, fmt='o')
         plt.xscale('log')
         plt.yscale('log')
         plt.savefig(name + '.eps')

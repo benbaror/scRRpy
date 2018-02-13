@@ -1,10 +1,6 @@
-
-from click.testing import CliRunner
-
-from scrrpy.cli import main
-from scrrpy.drr import DRR
 import numpy as np
 
+from scrrpy.drr import DRR
 
 # def test_main():
 #     runner = CliRunner()

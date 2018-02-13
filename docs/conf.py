@@ -14,6 +14,7 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
+    'sphinx.ext.mathjax',
 ]
 if os.getenv('SPELLCHECK'):
     extensions += 'sphinxcontrib.spelling',
@@ -34,12 +35,12 @@ extlinks = {
     'issue': ('https://github.com/benbaror/scrrpy/issues/%s', '#'),
     'pr': ('https://github.com/benbaror/scrrpy/pull/%s', 'PR #'),
 }
-import sphinx_py3doc_enhanced_theme
-html_theme = "sphinx_py3doc_enhanced_theme"
-html_theme_path = [sphinx_py3doc_enhanced_theme.get_html_theme_path()]
-html_theme_options = {
-    'githuburl': 'https://github.com/benbaror/scrrpy/'
-}
+#import sphinx_py3doc_enhanced_theme
+#html_theme = "sphinx_py3doc_enhanced_theme"
+#html_theme_path = [sphinx_py3doc_enhanced_theme.get_html_theme_path()]
+#html_theme_options = {
+#    'githuburl': 'https://github.com/benbaror/scrrpy/'
+#}
 
 html_use_smartypants = True
 html_last_updated_fmt = '%b %d, %Y'

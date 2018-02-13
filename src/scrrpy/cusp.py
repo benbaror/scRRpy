@@ -220,13 +220,6 @@ class Cusp(object):
         d_nu_mass = -self.stellar_mass(a) / self.mbh_mass * self._gp(j)
         return (d_nu_gr - d_nu_mass)*self.nu_r(a)
 
-    def nu_mass_inv(self, j, omega):
-        """
-        Return `a` such that `nu_mass(a,j) = omega`
-        """
-        nu_mass_rh = abs(self.nu_mass(self.rh, j))
-        return (omega/nu_mass_rh)**(1/(3/2-self.gamma))*self.rh
-
     def inverse_cumulative_a(self, x):
         """
         The inverse of N(a). Useful to generate a random

@@ -1,18 +1,24 @@
 language: python
 sudo: false
-python:
-    - "3.5"
-    - "3.6"
 
 matrix:
   fast_finish: true
+  include:
+    - python: "3.5"
+      env: TOXENV=py35
+    - python: "3.6"
+      env: TOXENV=py36
+    - python: "3.6"
+      env: TOXENV=docs
+    - python: "3.6"
+      env: TOXENV=check
 
 before_install:
   - python --version
   - uname -a
   - lsb_release -a
 install:
-  - pip install tox-travis codecov coverage
+  - pip install tox codecov coverage
 
 script:
   - tox -v

@@ -53,8 +53,8 @@ class Cusp(object):
     TODO: Implement normalization N(a) vs N(r)
     """
 
-    def __init__(self, gamma: float=1.75, mbh_mass: float=4e6,
-                 star_mass: float=1.0, rh: float=2.0) -> None:
+    def __init__(self, gamma=1.75, mbh_mass=4e6,
+                 star_mass=1.0, rh=2.0):
         """
         """
         self.gamma = float(gamma)
@@ -64,14 +64,14 @@ class Cusp(object):
         self.gr_factor = 1.0
 
     @property
-    def rg(self) -> float:
+    def rg(self):
         """
         Gravitational radius of the MBH [pc]
         """
         return RG0*self.mbh_mass
 
     @property
-    def tg(self) -> float:
+    def tg(self):
         """
         Light crossing time of the MBH [sec]
         """
@@ -98,21 +98,21 @@ class Cusp(object):
         return 4 * np.sqrt(self.rg / a)
 
     @property
-    def mass_ratio(self) -> float:
+    def mass_ratio(self):
         """
         MBH to star mass ratio
         """
         return self.mbh_mass / self.star_mass
 
     @property
-    def total_number_of_stars(self) -> float:
+    def total_number_of_stars(self):
         """
         Number of stars within the radius of influence `rh`
         """
         return self.total_stellar_mass / self.star_mass
 
     @property
-    def total_stellar_mass(self) -> float:
+    def total_stellar_mass(self):
         """
         Total mass within the radius of influence `rh` [solar mass]
 
@@ -120,7 +120,7 @@ class Cusp(object):
         """
         return self.mass_ratio
 
-    def number_of_stars(self, a: float) -> float:
+    def number_of_stars(self, a):
         """
         Number of stars with semi-major axis smaller than a[pc]
 
@@ -131,7 +131,7 @@ class Cusp(object):
         """
         return self.total_number_of_stars * (a / self.rh) ** (3 - self.gamma)
 
-    def stellar_mass(self, a: float) -> float:
+    def stellar_mass(self, a):
         """
         Enclosed mass within r = a[pc].
         TODO: check M(r) vs M(a)
@@ -143,7 +143,7 @@ class Cusp(object):
         """
         return self.total_stellar_mass * (a / self.rh) ** (3 - self.gamma)
 
-    def period(self, a: float) -> float:
+    def period(self, a):
         """
         The orbital period in years at a[pc]
 
@@ -154,7 +154,7 @@ class Cusp(object):
         """
         return 2*pi/self.nu_r(a)
 
-    def nu_r(self, a: float) -> float:
+    def nu_r(self, a):
         """
         The orbital frequency in rad/year at a[pc]
 
@@ -165,7 +165,7 @@ class Cusp(object):
         """
         return (self.rg/a)**1.5/self.tg
 
-    def nu_mass(self, a: float, j: float) -> float:
+    def nu_mass(self, a, j):
         """
         Precession frequency [rad/year] due to stellar mass.
 

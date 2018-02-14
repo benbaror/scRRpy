@@ -1,0 +1,10 @@
+me: py36
+dependencies:
+- python=3.6
+- matplotlib
+- jupyter
+- numpy
+- numba
+- cython
+- pip:
+  - vegas

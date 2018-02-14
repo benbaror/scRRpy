@@ -1,0 +1,13 @@
+backend      : Agg
+patch.edgecolor        : eeeeee
+font.size           : 18.0
+text.color           : black
+axes.prop_cycle: cycler('color', ['348ABD', '7A68A6', 'A60628', '467821', 'CF4457', '188487', 'E24A33'])
+savefig.bbox: tight
+
+legend.frameon: true
+legend.fancybox: true
+legend.framealpha: 0.0
+legend.fontsize: small
+figure.figsize   : 8, 6
+lines.linewidth   : 3.0

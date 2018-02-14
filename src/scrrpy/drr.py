@@ -287,7 +287,9 @@ class DRR(Cusp):
         example:
         drr = DRR.from_file(file_name)
         """
-        return cls(1.0)._read(file_name)
+        drr = cls(1.0)
+        drr._read(file_name)
+        return drr
 
 
 def integrate(func, integ, neval=1e4, tol=0.0):

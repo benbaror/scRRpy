@@ -7,5 +7,6 @@ dependencies:
 - numba
 - cython
 - h5py
+- astropy
 - pip:
   - vegas

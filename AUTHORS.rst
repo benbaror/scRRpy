@@ -2,4 +2,5 @@
 Authors
 =======
 
-* Ben Bar-Or - benbaror@gmail.com
+* Ben Bar-Or - benbaror@ias.edu
+* Jean-Baptiste Fouvry - fouvry@ias.edu

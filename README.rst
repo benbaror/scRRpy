@@ -3,6 +3,34 @@ Overview
 ========
 
 .. start-badges
+.. list-table::
+     :stub-columns: 1
+
+     * - docs
+       - |docs|
+     * - tests
+       - | |travis| |appveyor| |requires|
+         | |codecov|
+
+.. |docs| image:: https://readthedocs.org/projects/scrrpy/badge/?style=flat
+     :target: https://readthedocs.org/projects/scrrpy
+     :alt: Documentation Status
+
+.. |travis| image:: https://travis-ci.org/benbaror/scrrpy.svg?branch=master
+     :alt: Travis-CI Build Status
+     :target: https://travis-ci.org/benbaror/scrrpy
+
+.. |appveyor| image:: https://ci.appveyor.com/api/projects/status/github/benbaror/scrrpy?branch=master&svg=true
+     :alt: AppVeyor Build Status
+     :target: https://ci.appveyor.com/project/benbaror/scrrpy
+
+.. |requires| image:: https://requires.io/github/benbaror/scrrpy/requirements.svg?branch=master
+     :alt: Requirements Status
+     :target: https://requires.io/github/benbaror/scrrpy/requirements/?branch=master
+
+.. |codecov| image:: https://codecov.io/github/benbaror/scrrpy/coverage.svg?branch=master
+     :alt: Coverage Status
+     :target: https://codecov.io/github/benbaror/scrrpy
 
 .. end-badges
 
@@ -20,7 +48,7 @@ Installation
 Documentation
 =============
 
-.. https://scrrpy.readthedocs.io/
+https://scrrpy.readthedocs.io/
 
 Development
 ===========

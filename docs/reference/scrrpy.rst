@@ -7,3 +7,9 @@ scrrpy
 
 .. automodule:: scrrpy
     :members:
+
+.. autoclass:: DRR
+   :members:
+
+.. autoclass:: Cusp
+   :members:

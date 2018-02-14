@@ -16,6 +16,6 @@ include CONTRIBUTING.rst
 include LICENSE
 include README.rst
 
-include tox.ini .travis.yml appveyor.yml matplotlibrc
+include tox.ini .travis.yml appveyor.yml matplotlibrc readthedocs.yml environment.yml 
 
 global-exclude *.py[cod] __pycache__ *.so *.dylib .ipynb*/* sandbox/*

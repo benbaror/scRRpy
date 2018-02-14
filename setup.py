@@ -58,6 +58,7 @@ setup(
          'astronomy', 'astrophysics', 'science', 'diffusion', 'massive black holes', 'galactic center',
          'general relativity', 'statistical mechanics', 'stellar dynamics'
     ],
+    setup_requires = ['numpy', 'cython'],
     install_requires=[
         'click', 'numpy', 'scipy', 'progressbar2', 'cython', 'vegas', 'numba', 'astropy', 'matplotlib', 'h5py'
     ],

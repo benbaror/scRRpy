@@ -3,27 +3,17 @@ sudo: false
 python:
     - "3.5"
     - "3.6"
-env:
-  TOXENV=py
 
 matrix:
   fast_finish: true
-  include:
-    - python: 3.6
-      env: TOXENV=check
-    - python: 3.6
-      env: TOXENV=docs
 
 before_install:
   - python --version
   - uname -a
   - lsb_release -a
 install:
-  - pip install tox-travis
-  - virtualenv --version
-  - easy_install --version
-  - pip --version
-  - tox --version
+  - pip install tox-travis codecov coverage
+
 script:
   - tox -v
 after_failure:
@@ -39,6 +29,4 @@ notifications:
     on_success: never
     on_failure: always
 
-
-after_success:
-- if [[ $TOXENV == "py" ]]; then tox -e codecov; fi
+after_success: coverage combine && codecov

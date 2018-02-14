@@ -59,7 +59,7 @@ setup(
          'general relativity', 'statistical mechanics', 'stellar dynamics'
     ],
     install_requires=[
-        'click', 'numpy', 'scipy', 'progressbar2', 'vegas', 'numba', 'astropy', 'matplotlib', 'h5py'
+        'click', 'numpy', 'scipy', 'progressbar2', 'cython', 'vegas', 'numba', 'astropy', 'matplotlib', 'h5py'
     ],
     extras_require={
         # eg:

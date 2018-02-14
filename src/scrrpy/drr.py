@@ -157,8 +157,8 @@ class DRR(Cusp):
             for process in processes:
                 process.join()
 
-            _, results = zip(*sorted(map(queue.get, processes)))
-            drr, drr_err = np.hstack(results)
+            drr, drr_err = zip(*[(drr, drr_err) for (i, (drr, drr_err)) in sorted(map(queue.get, processes))])
+            drr, drr_err = np.concatenate(list(zip(*drr))), np.concatenate(list(zip(*drr_err)))
 
         else:
             results = [self._drr(j, omega, (l, n, n_p), neval=neval, tol=tol)

@@ -10,5 +10,6 @@ dependencies:
 - astropy
 - scipy
 - progressbar2
+- click
 - pip:
   - vegas

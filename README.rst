@@ -10,7 +10,7 @@ Overview
        - |docs|
      * - tests
        - | |travis| |appveyor| |requires|
-         | |codecov|
+         | |codecov| |coveralls|
 
 .. |docs| image:: https://readthedocs.org/projects/scrrpy/badge/?style=flat
      :target: https://readthedocs.org/projects/scrrpy
@@ -31,6 +31,10 @@ Overview
 .. |codecov| image:: https://codecov.io/github/benbaror/scrrpy/coverage.svg?branch=master
      :alt: Coverage Status
      :target: https://codecov.io/github/benbaror/scrrpy
+.. |coveralls| image:: https://coveralls.io/repos/github/benbaror/scRRpy/badge.svg?branch=master
+     :target: https://coveralls.io/github/benbaror/scRRpy?branch=master
+
+
 
 .. end-badges
 

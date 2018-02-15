@@ -7,5 +7,9 @@ dependencies:
 - numba
 - cython
 - h5py
+- astropy
+- scipy
+- progressbar2
+- click
 - pip:
   - vegas

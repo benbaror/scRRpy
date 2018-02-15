@@ -9,5 +9,6 @@ dependencies:
 - h5py
 - astropy
 - scipy
+- progressbar2
 - pip:
   - vegas

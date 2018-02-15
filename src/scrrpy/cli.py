@@ -47,4 +47,6 @@ def main(name, sma, l_max, gamma, mstar, mbh, rh, threads, neval, plot,
         plt.errorbar(drr.j, d_rr, d_err, fmt='o')
         plt.xscale('log')
         plt.yscale('log')
+        plt.xlabel(r'$J/J_\mathrm{c}$')
+        plt.ylabel(r'$D^{\mathrm{RR}}_{JJ}/J_\mathrm{c}^2$ [1/Myr]')
         plt.savefig(name + '.eps')

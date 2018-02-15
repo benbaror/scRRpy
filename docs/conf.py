@@ -2,10 +2,6 @@
 from __future__ import unicode_literals
 
 import os
-import sys
-
-sys.path.insert(0, os.path.abspath('../src/'))
-
 
 extensions = [
     'sphinx.ext.autodoc',
@@ -18,6 +14,8 @@ extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
     'sphinx.ext.mathjax',
+    'matplotlib.sphinxext.only_directives',
+    'matplotlib.sphinxext.plot_directive',
 ]
 if os.getenv('SPELLCHECK'):
     extensions += 'sphinxcontrib.spelling',

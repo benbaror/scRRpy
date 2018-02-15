@@ -1,0 +1,25 @@
+backend      : Agg
+patch.edgecolor        : eeeeee
+font.size           : 18.0
+text.color           : black
+axes.prop_cycle: cycler('color', ['348ABD', '7A68A6', 'A60628', '467821', 'CF4457', '188487', 'E24A33'])
+savefig.bbox: tight
+
+legend.frameon: true
+legend.fancybox: true
+legend.framealpha: 0.0
+legend.fontsize: small
+figure.figsize   : 8, 6
+lines.linewidth   : 3.0
+xtick.minor.width : 0.8
+ytick.minor.width : 0.8
+xtick.major.width : 1.0
+ytick.major.width : 1.0
+ytick.major.size     : 5.5
+ytick.major.pad      : 5.5
+xtick.major.size     : 5.5
+xtick.major.pad      : 5.5
+ytick.minor.size     : 3.5
+ytick.minor.pad      : 3.5
+xtick.minor.size     : 3.5
+xtick.minor.pad      : 3.5

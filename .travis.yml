@@ -8,7 +8,7 @@ matrix:
     - python: "3.5"
       env: TOXENV=py35
     - python: "3.6"
-      env: TOXENV=py36,coveralls,codecov
+      env: TOXENV=py36,coveralls
     - python: "3.6"
       env: TOXENV=docs
     - python: "3.6"

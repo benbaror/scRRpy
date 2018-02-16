@@ -23,7 +23,7 @@ from numpy import mod
 from numpy import sqrt
 from scipy import special
 
-from .cusp import Cusp
+from . import Cusp
 
 
 class DRR(Cusp):
@@ -57,7 +57,8 @@ class DRR(Cusp):
         default: 2.0
     """
 
-    def __init__(self, sma, gamma=1.75, mbh_mass=4e6, star_mass=1.0, j_grid_size=128, rh=2.0):
+    def __init__(self, sma, gamma=1.75, mbh_mass=4e6, star_mass=1.0,
+                 j_grid_size=128, rh=2.0):
 
         super().__init__(gamma=gamma,
                          mbh_mass=mbh_mass,
@@ -65,7 +66,8 @@ class DRR(Cusp):
                          rh=rh)
         self.sma = sma
         self.gr_factor = 1.0
-        self.j = np.logspace(np.log10(self.jlc(self.sma)), 0, j_grid_size + 1)[:-1]
+        self.j = np.logspace(np.log10(self.jlc(self.sma)), 0,
+                             j_grid_size + 1)[:-1]
         self.omega = self.nu_p(self.sma, self.j)
 
     @lru_cache()
@@ -77,7 +79,8 @@ class DRR(Cusp):
         a2_int = a2_integrand(self.sma, j, sma_p, j_p, lnnp, true_anomaly)
         return 2 * j_p * a2_int / d_nu_p / lnnp[-1]
 
-    def __call__(self, l_max, neval=1e3, threads=1, tol=0.0, progress_bar=True):
+    def __call__(self, l_max, neval=1e3, threads=1, tol=0.0,
+                 progress_bar=True):
         """
         Returns the RR diffusion coefficient over Jc^2 in 1/yr.
         """
@@ -150,15 +153,20 @@ class DRR(Cusp):
             omegas = [self.omega[i::threads] for i in range(threads)]
 
             seeds = np.random.randint(100000, size=threads)
-            processes = [mp.Process(target=parallel_drr, args=(i, seed, j, omega))
-                         for i, (seed, j, omega) in enumerate(zip(seeds, js, omegas))]
+            processes = [mp.Process(target=parallel_drr,
+                                    args=(i, seed, j, omega))
+                         for i, (seed, j, omega) in
+                         enumerate(zip(seeds, js, omegas))]
             for process in processes:
                 process.start()
             for process in processes:
                 process.join()
 
-            drr, drr_err = zip(*[(drr, drr_err) for (i, (drr, drr_err)) in sorted(map(queue.get, processes))])
-            drr, drr_err = np.concatenate(list(zip(*drr))), np.concatenate(list(zip(*drr_err)))
+            drr, drr_err = zip(*[(drr, drr_err)
+                                 for (i, (drr, drr_err)) in
+                                 sorted(map(queue.get, processes))])
+            drr, drr_err = (np.concatenate(list(zip(*drr))),
+                            np.concatenate(list(zip(*drr_err))))
 
         else:
             results = [self._drr(j, omega, (l, n, n_p), neval=neval, tol=tol)
@@ -225,7 +233,8 @@ class DRR(Cusp):
 
         return 4 * np.pi * (np.array([[int1, int2], [err1, err2]]) *
                             _a2_norm_factor(*lnnp) * lnnp[1] ** 2 *
-                            self.nu_r(self.sma) ** 2 / self.mass_ratio ** 2 * self.total_number_of_stars)
+                            self.nu_r(self.sma) ** 2 / self.mass_ratio ** 2 *
+                            self.total_number_of_stars)
 
     @property
     def l_max(self):
@@ -337,7 +346,28 @@ def _a2_norm_factor(l, n, n_p):
 
 class ResInterp(object):
     """
-    Interpolation function for the resonant condition
+    Generates an interpolation function `jp(ap)` where `jp`
+    satisfies the resonant condition: `nu_p(ap, jp) == omega`
+
+    Parameters
+    ----------
+    cusp : a `Cusp` instance
+    omega : ndarray
+          The resonance frequencies
+
+    Example
+    -------
+    >>> from scrrpy import Cusp
+    >>> from scrrpy.drr import ResInterp
+    >>> import numpy as np
+    >>> cusp = Cusp(gamma=1.75, mbh_mass=4e6, rh=2.0)
+    >>> j = np.logspace(-2, 0, 11)[:-1]
+    >>> omega = cusp.nu_p(a=0.1, j=j)
+    >>> resint = ResInterp(cusp, omega)
+    >>> jf = np.array([resint(o)(0.1) for o in omega])
+    >>> abs(1 - jf/j).max() < 1e-4
+    True
+
     """
 
     def __init__(self, cusp, omega, gr_factor=1.0):
@@ -356,7 +386,8 @@ class ResInterp(object):
             jlc = self._cusp.jlc(af)
             j = (1 - jlc) * self.x + jlc
             nup = self._cusp.nu_p(af, j)
-            j_grid.append(np.exp(np.interp(self.omega, nup, np.log(j), left=-np.inf, right=-np.inf)))
+            j_grid.append(np.exp(np.interp(self.omega, nup, np.log(j),
+                                           left=-np.inf, right=-np.inf)))
         j_grid = np.array(list(zip(*j_grid)))
         self.j_grid = dict(zip(omega, j_grid))
 
@@ -364,5 +395,6 @@ class ResInterp(object):
         j = self.j_grid[omega]
         ix = j > 0
         if sum(ix) >= 1:
-            return lambda af: np.interp(np.log(af), np.log(self._af[ix]), j[ix], left=0, right=0)
+            return lambda af: np.interp(np.log(af), np.log(self._af[ix]),
+                                        j[ix], left=0, right=0)
         pass

@@ -235,8 +235,8 @@ class Cusp(object):
         >>> cusp = Cusp(gamma=1.75)
         >>> np.random.seed(1234)
         >>> sma = cusp.inverse_cumulative_a(np.random.rand(100))
-        >>> print(sma.min(), sma.mean(), sma.max())
-        0.0343099647817 1.14741823174 1.98732028148
+        >>> print("{:0.10}, {:0.10}, {:0.10}".format(sma.min(), sma.mean(), sma.max()))
+        0.03430996478, 1.147418232, 1.987320281
         """
         return x**(1/(3-self.gamma))*self.rh
 

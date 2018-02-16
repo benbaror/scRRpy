@@ -6,22 +6,22 @@ Scalar Resonant Relaxation around a massive black hole
 
 .. start-badges
 
-.. |travis| image:: https://travis-ci.org/benbaror/scrrpy.svg?branch=master
+.. image:: https://travis-ci.org/benbaror/scrrpy.svg?branch=master
      :alt: Travis-CI Build Status
      :target: https://travis-ci.org/benbaror/scrrpy
 
-.. |coveralls| image:: https://coveralls.io/repos/github/benbaror/scrrpy/badge.svg?branch=master
+.. image:: https://coveralls.io/repos/github/benbaror/scrrpy/badge.svg?branch=master
      :target: https://coveralls.io/github/benbaror/scrrpy?branch=master
 
-.. |codecov| image:: https://codecov.io/github/benbaror/scrrpy/coverage.svg?branch=master
+.. image:: https://codecov.io/github/benbaror/scrrpy/coverage.svg?branch=master
      :alt: Coverage Status
      :target: https://codecov.io/github/benbaror/scrrpy
 
-.. |docs| image:: https://readthedocs.org/projects/scrrpy/badge/?style=flat
+.. image:: https://readthedocs.org/projects/scrrpy/badge/?style=flat
      :target: https://readthedocs.org/projects/scrrpy
      :alt: Documentation Status
 
-.. |requires| image:: https://requires.io/github/benbaror/scrrpy/requirements.svg?branch=master
+.. image:: https://requires.io/github/benbaror/scrrpy/requirements.svg?branch=master
      :alt: Requirements Status
      :target: https://requires.io/github/benbaror/scrrpy/requirements/?branch=master
 

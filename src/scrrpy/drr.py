@@ -44,7 +44,7 @@ class DRR(Cusp):
         default: 7/4 (Bahcall wolf cusp)
     mbh_mass : float, int, optional
         Mass of the MBH [solar mass].
-        default: 4.3 10^6 (Milky Way MBH)
+        default: 4.3x10^6 (Milky Way MBH)
     star_mass : float, int, optional
         Mass of individual stars [solar mass].
         default: 1.0
@@ -53,7 +53,7 @@ class DRR(Cusp):
         Define as the radius in which the velocity
         dispersion of the stellar cusp :math:`\sigma` is equal to the
         Keplerian velocity due to the MBH
-        :math:`\sigma(r_h)^2 = G M_\bullet / r_h`.
+        :math:`\sigma(r_h)^2 = G M_{\\bullet} / r_h`.
         default: 2.0
     """
 

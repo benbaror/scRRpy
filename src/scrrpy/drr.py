@@ -66,7 +66,7 @@ class DRR(Cusp):
         self.sma = sma
         self.gr_factor = 1.0
         self.j = np.logspace(np.log10(self.jlc(self.sma)), 0, j_grid_size + 1)[:-1]
-        self.omega = abs(self.nu_p(self.sma, self.j))
+        self.omega = self.nu_p(self.sma, self.j)
 
     @lru_cache()
     def _res_intrp(self, ratio):
@@ -183,8 +183,8 @@ class DRR(Cusp):
 
     def _drr(self, j, omega, lnnp, neval=1e3, tol=0.0):
         ratio = lnnp[1] / lnnp[-1]
-        get_jf1 = self._res_intrp(ratio).get_jf1(omega * ratio)
-        get_jf2 = self._res_intrp(ratio).get_jf2(omega * ratio)
+        get_jf1 = self._res_intrp(ratio)(omega * ratio)
+        get_jf2 = self._res_intrp(-ratio)(- omega * ratio)
 
         @vegas.batchintegrand
         def c_lnnp1(x):
@@ -210,6 +210,7 @@ class DRR(Cusp):
                                            true_anomaly[:, ix2])
             return res
 
+        self.c_lnnp1 = c_lnnp1
         integ = vegas.Integrator(5 * [[0, 1]])
 
         if get_jf1 is None:
@@ -343,74 +344,25 @@ class ResInterp(object):
         """
         """
         self._cusp = cusp
+        self.size = 1000
         self._cusp.gr_factor = gr_factor
         self.omega = omega
         self._af = np.logspace(np.log10(self._cusp.rg),
                                np.log10(self._cusp.rh),
                                1000)
+        self.x = np.logspace(-5, 0, self.size + 1)[:-1][::-1]
+        j_grid = []
+        for af in self._af:
+            jlc = self._cusp.jlc(af)
+            j = (1 - jlc) * self.x + jlc
+            nup = self._cusp.nu_p(af, j)
+            j_grid.append(np.exp(np.interp(self.omega, nup, np.log(j), left=-np.inf, right=-np.inf)))
+        j_grid = np.array(list(zip(*j_grid)))
+        self.j_grid = dict(zip(omega, j_grid))
 
-        # self._jf = np.logspace(np.log10(self._cusp.jlc(self._cusp.rh)),
-        #                                 0, 1001)[:-1]
-
-        def get_j(_nup):
-            jf = self._jf[_nup > 0]
-            _nup = _nup[_nup > 0]
-            s = np.argsort(_nup)
-            j = np.interp(self.omega, _nup[s], jf[s], left=0, right=0)
-
-            # j[self.omega < nup.min()] = 0
-            # j[self.omega > nup.max()] = 0
-            return j
-
-        # The minimal a at which omega changes sign.
-        a_gr1 = self._cusp.a_gr1
-        # The minimal at which omega intersects nu_p
-        self._af = np.logspace(np.log10(self._cusp.rg),
-                               np.log10(self._cusp.rh),
-                               1000)
-
-        a_min = self._af[(self._af < a_gr1) *
-                         (omega.max() < self._cusp.nu_p1(self._af))].max()
-        self._af = np.logspace(np.log10(a_min),
-                               np.log10(self._cusp.rh),
-                               1000)
-
-        self._j1 = np.zeros([self._af.size, self.omega.size])
-        self._j2 = np.zeros([self._af.size, self.omega.size])
-
-        last = 0
-        for i, a in enumerate(self._af[self._af < a_gr1]):
-            self._jf = np.logspace(np.log10(self._cusp.jlc(a)),
-                                   0, 1001)[:-1]
-            nup = self._cusp.nu_p(a, self._jf)
-            self._j1[i, :] = get_j(nup)
-            last += 1
-        # last += 1
-
-        for i, a in enumerate(self._af[self._af > a_gr1]):
-            self._jf = np.logspace(np.log10(self._cusp.jlc(a)),
-                                   0, 1001)[:-1]
-            nup = self._cusp.nu_p(a, self._jf)
-            self._j1[i + last, :] = get_j(nup)
-            if any(nup < 0):
-                self._j2[i + last, :] = get_j(-nup)
-
-    def get_jf1(self, omega):
-        i = np.argmin(abs(self.omega - omega))
-        if abs(self.omega[i] - omega) > 1e-8:
-            raise ValueError
-        j = self._j1[:, i]
-        ix = np.where(j > 0)[0]
-        if len(ix) > 0:
-            return lambda af: np.interp(af,
-                                        self._af[ix], j[ix], left=0, right=0)
-
-    def get_jf2(self, omega):
-        i = np.argmin(abs(self.omega - omega))
-        if abs(self.omega[i] - omega) > 1e-8:
-            raise ValueError
-        j = self._j2[:, i]
-        ix = np.where(j > 0)[0]
-        if len(ix) > 0:
-            return lambda af: np.interp(af,
-                                        self._af[ix], j[ix], left=0, right=0)
+    def __call__(self, omega):
+        j = self.j_grid[omega]
+        ix = j > 0
+        if sum(ix) >= 1:
+            return lambda af: np.interp(np.log(af), np.log(self._af[ix]), j[ix], left=0, right=0)
+        pass

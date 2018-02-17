@@ -138,6 +138,9 @@ class DRR(Cusp):
         """
         neval = int(neval)
 
+        # Pre compute the resonance interpolation grid
+        ratio = n / n_p
+        self._res_intrp(ratio)
         try:
             drr, drr_err = self._drr_lnnp_cache[Res(l, n, n_p, neval)]
 

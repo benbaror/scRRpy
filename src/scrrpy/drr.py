@@ -80,7 +80,7 @@ class DRR(Cusp):
     def _integrand(self, j, sma_p, j_p, lnnp, true_anomaly):
         d_nu_p = abs(self.d_nu_p(sma_p, j_p))
         a2_int = a2_integrand(self.sma, j, sma_p, j_p, lnnp, true_anomaly)
-        return 2 * j_p * a2_int / d_nu_p / lnnp[-1]
+        return j_p * a2_int / d_nu_p
 
     def __call__(self, l_max, neval=1e3, threads=1,
                  progress_bar=True):
@@ -106,8 +106,8 @@ class DRR(Cusp):
         lnnp = [(l, n, n_p)
                 for l in range(1, l_max + 1)
                 for n in range(1, l + 1)
-                for n_p in range(1, l + 1)
-                if not mod(l + n, 2) + mod(l + n_p, 2)
+                for n_p in range(-l - 1, l + 1)
+                if (not mod(l + n, 2) + mod(l + n_p, 2)) and n_p != 0
                 ]
 
         if progress_bar:
@@ -137,14 +137,10 @@ class DRR(Cusp):
         Calculates the l,n,n_p term of the diffusion coefficient
         """
         neval = int(neval)
-        try:
-            drr = (self._drr_lnnp_cache[Res(l, n, n_p, neval)][0] +
-                   self._drr_lnnp_cache[Res(l, n, -n_p, neval)][0])
 
-            drr_err = sqrt(
-                self._drr_lnnp_cache[Res(l, n, n_p, neval)][-1] ** 2 +
-                self._drr_lnnp_cache[Res(l, n, -n_p, neval)][-1] ** 2
-            )
+        try:
+            drr, drr_err = self._drr_lnnp_cache[Res(l, n, n_p, neval)]
+
             return drr, drr_err
         except AttributeError:
             self._drr_lnnp_cache = {}
@@ -186,66 +182,39 @@ class DRR(Cusp):
                        for j, omega, i in zip(self.j, self.omega,
                                               range(self.j.size))]
 
-            drr = np.array([result[0] for result in results])
-            drr_err = np.array([result[-1] for result in results])
+            drr, drr_err = np.array(list(zip(*results)))
 
-        self._drr_lnnp_cache[Res(l, n, -n_p, neval)] = \
-            (drr[:, 0], drr_err[:, 0])
-        self._drr_lnnp_cache[Res(l, n, n_p, neval)] = \
-            (drr[:, -1], drr_err[:, -1])
+        self._drr_lnnp_cache[Res(l, n, n_p, neval)] = (drr, drr_err)
 
-        drr = (self._drr_lnnp_cache[Res(l, n, n_p, neval)][0] +
-               self._drr_lnnp_cache[Res(l, n, -n_p, neval)][0])
-        drr_err = sqrt(self._drr_lnnp_cache[Res(l, n, n_p, neval)][-1] ** 2 +
-                       self._drr_lnnp_cache[Res(l, n, -n_p, neval)][-1] ** 2)
         return drr, drr_err
 
     def _drr(self, j, omega, lnnp, neval=1e3):
         ratio = lnnp[1] / lnnp[-1]
-        get_jf1 = self._res_intrp(ratio)(omega * ratio)
-        get_jf2 = self._res_intrp(-ratio)(- omega * ratio)
+        get_jf = self._res_intrp(ratio)(omega * ratio)
 
         @vegas.batchintegrand
-        def c_lnnp1(x):
+        def c_lnnp(x):
             true_anomaly = x[:, :-1].T * np.pi
             sma_f = self.inverse_cumulative_a(x[:, -1])
-            jf1 = get_jf1(sma_f)
+            jf = get_jf(sma_f)
             res = np.zeros(x.shape[0], float)
-            ix1 = np.where(jf1 > 0)[0]
-            if len(ix1) > 0:
-                res[ix1] = self._integrand(j, sma_f[ix1], jf1[ix1], lnnp,
-                                           true_anomaly[:, ix1])
+            ix = np.where(jf > 0)[0]
+            if len(ix) > 0:
+                res[ix] = self._integrand(j, sma_f[ix], jf[ix], lnnp,
+                                          true_anomaly[:, ix])
             return res
 
-        @vegas.batchintegrand
-        def c_lnnp2(x):
-            true_anomaly = x[:, :-1].T * np.pi
-            sma_f = self.inverse_cumulative_a(x[:, -1])
-            jf2 = get_jf2(sma_f)
-            res = np.zeros(x.shape[0], float)
-            ix2 = np.where(jf2 > 0)[0]
-            if len(ix2) > 0:
-                res[ix2] = self._integrand(j, sma_f[ix2], jf2[ix2], lnnp,
-                                           true_anomaly[:, ix2])
-            return res
-
-        self.c_lnnp1 = c_lnnp1
         integ = vegas.Integrator(5 * [[0, 1]])
 
-        if get_jf1 is None:
-            int1, err1 = 0.0, 0.0
+        if get_jf is None:
+            result = np.zeros(2)
         else:
-            int1, err1 = np.array(integrate(c_lnnp1, integ, neval))
+            result = np.array(integrate(c_lnnp, integ, neval))
 
-        if get_jf2 is None:
-            int2, err2 = 0.0, 0.0
-        else:
-            int2, err2 = np.array(integrate(c_lnnp2, integ, neval))
-
-        return 4 * np.pi * (np.array([[int1, int2], [err1, err2]]) *
-                            _a2_norm_factor(*lnnp) * lnnp[1] ** 2 *
-                            self.nu_r(self.sma) ** 2 / self.mass_ratio ** 2 *
-                            self.total_number_of_stars)
+        return result * (8 * np.pi * lnnp[1] ** 2 / abs(lnnp[-1]) *
+                         _a2_norm_factor(*lnnp) *
+                         self.nu_r(self.sma) ** 2 / self.mass_ratio ** 2 *
+                         self.total_number_of_stars)
 
     @property
     def l_max(self):

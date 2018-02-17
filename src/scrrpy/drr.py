@@ -61,7 +61,7 @@ class DRR(Cusp):
     """
 
     def __init__(self, sma, gamma=1.75, mbh_mass=4e6, star_mass=1.0,
-                 j_grid_size=128, rh=2.0):
+                 j_grid_size=128, rh=2.0, seed=None):
 
         super().__init__(gamma=gamma,
                          mbh_mass=mbh_mass,
@@ -72,6 +72,14 @@ class DRR(Cusp):
         self.j = np.logspace(np.log10(self.jlc(self.sma)), 0,
                              j_grid_size + 1)[:-1]
         self.omega = self.nu_p(self.sma, self.j)
+        if seed is None:
+            self.seed = np.random.randint(int(1e8))
+        else:
+            self.seed = seed
+
+        np.random.seed(self.seed)
+
+        self.seeds = np.random.randint(int(1e8), size=self.j.size)
 
     @lru_cache()
     def _res_intrp(self, ratio):
@@ -83,7 +91,7 @@ class DRR(Cusp):
         return j_p * a2_int / d_nu_p
 
     def __call__(self, l_max, neval=1e3, threads=1,
-                 progress_bar=True):
+                 progress_bar=True, seed=None):
         """
         Returns the RR diffusion coefficient :math:`D_{JJ}/J_c^2` [1/yr].
 
@@ -153,22 +161,23 @@ class DRR(Cusp):
         if threads > 1:
             queue = mp.Queue()
 
-            def parallel_drr(pos, seed, j, omega):
-                np.random.seed(seed)
-                _results = [self._drr(j, omega, (l, n, n_p), neval=neval)
-                            for j, omega in zip(j, omega)]
+            def parallel_drr(pos, j_s, omega_s, seed_s):
+                _results = [
+                    self._drr(j, omega, (l, n, n_p), neval=neval, seed=seed)
+                    for j, omega, seed in zip(j_s, omega_s, seed_s)
+                ]
                 _drr = [result[0] for result in _results]
                 _drr_err = [result[-1] for result in _results]
                 queue.put((pos, (_drr, _drr_err)))
 
             js = [self.j[i::threads] for i in range(threads)]
             omegas = [self.omega[i::threads] for i in range(threads)]
+            seeds = [self.seeds[i::threads] for i in range(threads)]
 
-            seeds = np.random.randint(100000, size=threads)
-            processes = [mp.Process(target=parallel_drr,
-                                    args=(i, seed, j, omega))
-                         for i, (seed, j, omega) in
-                         enumerate(zip(seeds, js, omegas))]
+            processes = [
+                mp.Process(target=parallel_drr, args=(i, j_s, omega_s, seed_s))
+                for i, (j_s, omega_s, seed_s) in
+                enumerate(zip(js, omegas, seeds))]
             for process in processes:
                 process.start()
             for process in processes:
@@ -181,9 +190,9 @@ class DRR(Cusp):
                             np.concatenate(list(zip(*drr_err))))
 
         else:
-            results = [self._drr(j, omega, (l, n, n_p), neval=neval)
-                       for j, omega, i in zip(self.j, self.omega,
-                                              range(self.j.size))]
+            results = [self._drr(j, omega, (l, n, n_p), neval=neval, seed=seed)
+                       for j, omega, seed in
+                       zip(self.j, self.omega, self.seeds)]
 
             drr, drr_err = np.array(list(zip(*results)))
 
@@ -191,13 +200,19 @@ class DRR(Cusp):
 
         return drr, drr_err
 
-    def _drr(self, j, omega, lnnp, neval=1e3):
-        ratio = lnnp[1] / lnnp[-1]
+    def _drr(self, j, omega, lnnp, neval=1e3, seed=None):
+        l, n, n_p = lnnp
+        ratio = n / n_p
         get_jf = self._res_intrp(ratio)(omega * ratio)
+        if seed is not None:
+            # make a unique seed
+            np.random.seed([seed, l, n, 2 * l + n_p])
+
+        pi = np.pi
 
         @vegas.batchintegrand
         def c_lnnp(x):
-            true_anomaly = x[:, :-1].T * np.pi
+            true_anomaly = x[:, :-1].T * pi
             sma_f = self.inverse_cumulative_a(x[:, -1])
             jf = get_jf(sma_f)
             res = np.zeros(x.shape[0], float)
@@ -214,7 +229,7 @@ class DRR(Cusp):
         else:
             result = np.array(integrate(c_lnnp, integ, neval))
 
-        return result * (8 * np.pi * lnnp[1] ** 2 / abs(lnnp[-1]) *
+        return result * (8 * pi * n ** 2 / abs(n_p) *
                          _a2_norm_factor(*lnnp) *
                          self.nu_r(self.sma) ** 2 / self.mass_ratio ** 2 *
                          self.total_number_of_stars)

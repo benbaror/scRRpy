@@ -1,15 +1,24 @@
 scrrpy
 ======
-
-.. testsetup::
-
-    from scrrpy import *
-
-.. automodule:: scrrpy
-    :members:
+.. currentmodule:: scrrpy
 
 .. autoclass:: DRR
-   :members:
+   :show-inheritance:
+
+   .. rubric:: Methods Summary
+
+   .. autosummary::
+
+      ~DRR.__call__
+      ~DRR.save
+      ~DRR.from_file
+
+   .. rubric:: Methods Documentation
+
+   .. automethod:: __call__
+   .. automethod:: save
+   .. automethod:: from_file
+
 
 .. autoclass:: Cusp
    :members:

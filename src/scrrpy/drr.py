@@ -7,10 +7,11 @@ from __future__ import division
 from __future__ import print_function
 
 import multiprocessing as mp
-from ast import literal_eval as make_tuple
+from ast import literal_eval as make_dict
 from builtins import range
 from builtins import super
 from builtins import zip
+from collections import namedtuple
 from functools import lru_cache
 
 import h5py
@@ -25,10 +26,12 @@ from scipy import special
 
 from . import Cusp
 
+Res = namedtuple('Res', ('l', 'n', 'np', 'neval'))
+
 
 class DRR(Cusp):
     """
-    Resonant relaxation diffusion coefficient (DRR)
+    Resonant relaxation diffusion coefficient (DRR).
     Assuming a power law stellar cusp around a massive black hole (MBH).
     The cusp is assumed to have an isotropic distribution function
     :math:`f(E) \propto |E|^p` corresponding ro a stellar density
@@ -79,10 +82,24 @@ class DRR(Cusp):
         a2_int = a2_integrand(self.sma, j, sma_p, j_p, lnnp, true_anomaly)
         return 2 * j_p * a2_int / d_nu_p / lnnp[-1]
 
-    def __call__(self, l_max, neval=1e3, threads=1, tol=0.0,
+    def __call__(self, l_max, neval=1e3, threads=1,
                  progress_bar=True):
         """
-        Returns the RR diffusion coefficient over Jc^2 in 1/yr.
+        Returns the RR diffusion coefficient :math:`D_{JJ}/J_c^2` [1/yr].
+
+        Parameters
+        ----------
+        l_max : int
+            Maximal order of spherical polynomial to compute
+        neval : int
+            The maximum number of integrand evaluations
+            in each iteration of the |vegas| algorithm.
+            Default: 1000
+        threads : int
+            Number of parallel threads to use,
+            default is 1 (no palatalization)
+        progress_bar : bool
+            Show progress bar, default is ``True``
         """
 
         # Get all non-vanishing resonances up to l=l_max
@@ -99,10 +116,9 @@ class DRR(Cusp):
             pbar = range(len(lnnp))
 
         for i in pbar:
-            self._drr_lnnp(*lnnp[i], neval=neval, threads=threads, tol=tol)
+            self._drr_lnnp(*lnnp[i], neval=neval, threads=threads)
 
-        drr = np.vstack([self._drr_lnnp(*lnnp, neval=neval, threads=threads,
-                                        tol=tol)[0]
+        drr = np.vstack([self._drr_lnnp(*lnnp, neval=neval, threads=threads)[0]
                          for lnnp in lnnp])
 
         # Remove non-physical values
@@ -112,25 +128,23 @@ class DRR(Cusp):
         drr = drr.sum(axis=0)
 
         drr_err = sqrt(sum(self._drr_lnnp(*lnnp, neval=neval,
-                                          threads=threads,
-                                          tol=tol)[-1] ** 2
+                                          threads=threads)[-1] ** 2
                            for lnnp in lnnp))
         return drr, drr_err
 
-    def _drr_lnnp(self, l, n, n_p, neval=1e3, threads=1,
-                  tol=0.0):
+    def _drr_lnnp(self, l, n, n_p, neval=1e3, threads=1):
         """
         Calculates the l,n,n_p term of the diffusion coefficient
         """
         neval = int(neval)
         try:
-            drr = (self._drr_lnnp_cache[str((l, n, n_p, neval, tol))][0] +
-                   self._drr_lnnp_cache[str((l, n, -n_p, neval, tol))][0])
+            drr = (self._drr_lnnp_cache[Res(l, n, n_p, neval)][0] +
+                   self._drr_lnnp_cache[Res(l, n, -n_p, neval)][0])
 
-            drr_err = sqrt(self._drr_lnnp_cache[str((l, n, n_p, neval,
-                                                     tol))][-1] ** 2 +
-                           self._drr_lnnp_cache[str((l, n, -n_p, neval,
-                                                     tol))][-1] ** 2)
+            drr_err = sqrt(
+                self._drr_lnnp_cache[Res(l, n, n_p, neval)][-1] ** 2 +
+                self._drr_lnnp_cache[Res(l, n, -n_p, neval)][-1] ** 2
+            )
             return drr, drr_err
         except AttributeError:
             self._drr_lnnp_cache = {}
@@ -142,8 +156,7 @@ class DRR(Cusp):
 
             def parallel_drr(pos, seed, j, omega):
                 np.random.seed(seed)
-                _results = [self._drr(j, omega, (l, n, n_p), neval=neval,
-                                      tol=tol)
+                _results = [self._drr(j, omega, (l, n, n_p), neval=neval)
                             for j, omega in zip(j, omega)]
                 _drr = [result[0] for result in _results]
                 _drr_err = [result[-1] for result in _results]
@@ -169,27 +182,25 @@ class DRR(Cusp):
                             np.concatenate(list(zip(*drr_err))))
 
         else:
-            results = [self._drr(j, omega, (l, n, n_p), neval=neval, tol=tol)
+            results = [self._drr(j, omega, (l, n, n_p), neval=neval)
                        for j, omega, i in zip(self.j, self.omega,
                                               range(self.j.size))]
 
             drr = np.array([result[0] for result in results])
             drr_err = np.array([result[-1] for result in results])
 
-        self._drr_lnnp_cache[str((l, n, -n_p,
-                                  neval, tol))] = (drr[:, 0], drr_err[:, 0])
-        self._drr_lnnp_cache[str((l, n, n_p,
-                                  neval, tol))] = (drr[:, -1], drr_err[:, -1])
+        self._drr_lnnp_cache[Res(l, n, -n_p, neval)] = \
+            (drr[:, 0], drr_err[:, 0])
+        self._drr_lnnp_cache[Res(l, n, n_p, neval)] = \
+            (drr[:, -1], drr_err[:, -1])
 
-        drr = (self._drr_lnnp_cache[str((l, n, n_p, neval, tol))][0] +
-               self._drr_lnnp_cache[str((l, n, -n_p, neval, tol))][0])
-        drr_err = sqrt(self._drr_lnnp_cache[str((l, n, n_p, neval,
-                                                 tol))][-1] ** 2 +
-                       self._drr_lnnp_cache[str((l, n, -n_p, neval,
-                                                 tol))][-1] ** 2)
+        drr = (self._drr_lnnp_cache[Res(l, n, n_p, neval)][0] +
+               self._drr_lnnp_cache[Res(l, n, -n_p, neval)][0])
+        drr_err = sqrt(self._drr_lnnp_cache[Res(l, n, n_p, neval)][-1] ** 2 +
+                       self._drr_lnnp_cache[Res(l, n, -n_p, neval)][-1] ** 2)
         return drr, drr_err
 
-    def _drr(self, j, omega, lnnp, neval=1e3, tol=0.0):
+    def _drr(self, j, omega, lnnp, neval=1e3):
         ratio = lnnp[1] / lnnp[-1]
         get_jf1 = self._res_intrp(ratio)(omega * ratio)
         get_jf2 = self._res_intrp(-ratio)(- omega * ratio)
@@ -224,12 +235,12 @@ class DRR(Cusp):
         if get_jf1 is None:
             int1, err1 = 0.0, 0.0
         else:
-            int1, err1 = np.array(integrate(c_lnnp1, integ, neval, tol))
+            int1, err1 = np.array(integrate(c_lnnp1, integ, neval))
 
         if get_jf2 is None:
             int2, err2 = 0.0, 0.0
         else:
-            int2, err2 = np.array(integrate(c_lnnp2, integ, neval, tol))
+            int2, err2 = np.array(integrate(c_lnnp2, integ, neval))
 
         return 4 * np.pi * (np.array([[int1, int2], [err1, err2]]) *
                             _a2_norm_factor(*lnnp) * lnnp[1] ** 2 *
@@ -239,7 +250,7 @@ class DRR(Cusp):
     @property
     def l_max(self):
         try:
-            return max([make_tuple(key)[0]
+            return max([key.l
                         for key in self._drr_lnnp_cache.keys()])
         except AttributeError:
             pass
@@ -247,27 +258,28 @@ class DRR(Cusp):
     @property
     def neval(self):
         try:
-            return max([make_tuple(key)[-2]
-                        for key in self._drr_lnnp_cache.keys()])
-        except AttributeError:
-            pass
-
-    @property
-    def tol(self):
-        try:
-            return min([make_tuple(key)[-1]
+            return max([key.neval
                         for key in self._drr_lnnp_cache.keys()])
         except AttributeError:
             pass
 
     def save(self, file_name):
         """
-        Save the cached data to an hdf5 file so it can be read later.
+        Save the current instance to an hdf5 file.
+
+        Example
+        -------
+        >>> drr = DRR(0.1, j_grid_size=32)
+        >>> d, d_err = drr(l_max=3)
+        >>> drr.save('example.hdf5')
+        >>> drr = DRR.from_file('example.hdf5')
+        >>> d, d_err = drr(l_max=drr.l_max, neval=drr.neval)
+
         """
         with h5py.File(file_name, 'w') as h5:
             drr_lnnp_cache = h5.create_group("_drr_lnnp_cache")
             for key, value in self._drr_lnnp_cache.items():
-                drr_lnnp_cache[key] = value
+                drr_lnnp_cache[str(dict(key._asdict()))] = value
             for key, value in self.__dict__.items():
                 try:
                     h5[key] = value
@@ -282,9 +294,9 @@ class DRR(Cusp):
 
             for key, value in h5['_drr_lnnp_cache'].items():
                 try:
-                    self._drr_lnnp_cache[key] = value.value
+                    self._drr_lnnp_cache[Res(**make_dict(key))] = value.value
                 except AttributeError:
-                    self._drr_lnnp_cache = {key: value.value}
+                    self._drr_lnnp_cache = {Res(**make_dict(key)): value.value}
 
             for key, value in h5.items():
                 if key != '_drr_lnnp_cache':
@@ -294,16 +306,20 @@ class DRR(Cusp):
     def from_file(cls, file_name):
         """Load from file and return an instance
 
-        example:
-        drr = DRR.from_file(file_name)
+        Example
+        -------
+        >>> drr = DRR(0.1, j_grid_size=32)
+        >>> d, d_err = drr(l_max=3)
+        >>> drr.save('example.hdf5')
+        >>> drr = DRR.from_file('example.hdf5')
+        >>> d, d_err = drr(l_max=drr.l_max, neval=drr.neval)
         """
         drr = cls(1.0)
         drr._read(file_name)
         return drr
 
 
-def integrate(func, integ, neval=1e4, tol=0.0):
-    integ.set(rtol=tol)
+def integrate(func, integ, neval=1e4):
     integ(func, nitn=10, neval=neval)
     result = integ(func, nitn=10, neval=neval)
     try:

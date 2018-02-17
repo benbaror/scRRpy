@@ -40,7 +40,7 @@ def main(name, sma, l_max, gamma, mstar, mbh, rh, threads, neval, plot,
          no_pbar, j_grid):
     drr = DRR(sma, gamma=gamma, mbh_mass=mbh, star_mass=mstar, rh=rh, j_grid_size=j_grid)
 
-    d_rr, d_err = drr(l_max, threads=threads, tol=0.0, neval=neval, progress_bar=not no_pbar)
+    d_rr, d_err = drr(l_max, threads=threads, neval=neval, progress_bar=not no_pbar)
     drr.save(name + '.hdf5')
     if plot:
         import matplotlib.pyplot as plt

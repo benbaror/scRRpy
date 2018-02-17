@@ -83,8 +83,8 @@ class Cusp(object):
           Minimal normalized angular momentum on which orbits are stable.
 
           :math:`j_{lc} = J_{lc} / J_c`,
-          where :math:`J_{lc} = 4GM_\bullat/c` is the last stable orbit in the
-          parabolic limit and :math:`J_c = \sqrt{GM_\bullet a}` is the
+          where :math:`J_{lc} = 4GM_{\\bullat}/c` is the last stable orbit in the
+          parabolic limit and :math:`J_c = \sqrt{GM_{\\bullet} a}` is the
           maximal (circular) stable orbit.
 
           This is an approximation which works when the orbital binding energy

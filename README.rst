@@ -42,7 +42,7 @@ PYTHON VERSIONS AND DEPENDENCIES
 This package requires:
  * `Numpy <http://numpy.scipy.org/>`__
  * `Scipy <http://www.scipy.org/>`__
- * `Matplotlib <http://matplotlib.sourceforge.net/>`__
+ * `Matplotlib <https://matplotlib.org/>`__
  * `astropy <http://www.astropy.org/>`__
  * `numba <https://numba.pydata.org/>`__
  * `vegas <https://github.com/gplepage/vegas>`__

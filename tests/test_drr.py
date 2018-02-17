@@ -10,7 +10,7 @@ def test_io():
     d, d_err = drr(2, neval=1e3, threads=1)
     drr.save("test.hdf5")
     drr = DRR.from_file("test.hdf5")
-    d_load, d_load_err = drr(drr.l_max, neval=drr.neval, tol=drr.tol, progress_bar=False)
+    d_load, d_load_err = drr(drr.l_max, neval=drr.neval, progress_bar=False)
     np.testing.assert_array_almost_equal_nulp(d, d_load)
     np.testing.assert_array_almost_equal_nulp(d_err, d_load_err)
 

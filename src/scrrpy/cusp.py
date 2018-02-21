@@ -1,4 +1,6 @@
-r"""Properties of the stellar cusp"""
+r"""
+Properties of the stellar cusp
+"""
 
 import numpy as np
 # noinspection PyUnresolvedReferences
@@ -38,20 +40,20 @@ class Cusp(object):
     ----------
     gamma : float, int, optional
         The slope of the density profile.
-        default: 7/4 (Bahcall-Wolf cusp)
+        Default: 7/4 (Bahcall-Wolf cusp)
     mbh_mass : float, int
         Mass of the MBH [solar mass].
-        default: :math:`4.3 \times 10^6` (Milky Way MBH)
+        Default: :math:`4.3 \times 10^6` (Milky Way MBH)
     star_mass : float, int
         Mass of individual stars [solar mass].
-        default: 1.0
+        Default: 1.0
     rh : float, int
         Radius of influence [pc].
         Define as the radius in which the velocity
         dispersion of the stellar cusp :math:`\sigma` is equal to the
         Keplerian velocity due to the MBH
         :math:`\sigma(r_{\mathrm{h}})^2 = G M_{\bullet} / r_{\mathrm{h}}`.
-        default: 2.0
+        Default: 2.0
     """
 
     def __init__(self, gamma=1.75, mbh_mass=4e6,

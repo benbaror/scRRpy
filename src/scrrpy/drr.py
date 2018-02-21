@@ -44,20 +44,20 @@ class DRR(Cusp):
 
     gamma : float, int, optional
         The slope of the density profile.
-        default: 7/4 (Bahcall wolf cusp)
+        Default: 7/4 (Bahcall wolf cusp)
     mbh_mass : float, int, optional
         Mass of the MBH [solar mass].
-        default: :math:`4.3 \times 10^6` (Milky Way MBH)
+        Default: :math:`4.3 \times 10^6` (Milky Way MBH)
     star_mass : float, int, optional
         Mass of individual stars [solar mass].
-        default: 1.0
+        Default: 1.0
     rh : float, int, optional
         Radius of influence [pc].
         Define as the radius in which the velocity
         dispersion of the stellar cusp :math:`\sigma` is equal to the
         Keplerian velocity due to the MBH
         :math:`\sigma(r_\mathrm{h})^2 = G M_{\bullet} / r_\mathrm{h}`.
-        default: 2.0
+        Default: 2.0
     """
 
     def __init__(self, sma, gamma=1.75, mbh_mass=4e6, star_mass=1.0,
@@ -104,10 +104,11 @@ class DRR(Cusp):
             in each iteration of the `vegas` algorithm.
             Default: 1000
         threads : int
-            Number of parallel threads to use,
-            default is 1 (no parallelization)
+            Number of parallel threads to use.
+            Default: 1 (no parallelization)
         progress_bar : bool
-            Show progress bar, default is ``True``
+            Show progress bar.
+            Default: ``True``
         """
 
         # Get all non-vanishing resonances up to l=l_max

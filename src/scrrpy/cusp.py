@@ -34,7 +34,7 @@ class Cusp(object):
     ----------
     gamma : float, int, optional
         The slope of the density profile.
-        default: 7/4 (Bahcall wolf cusp)
+        default: 7/4 (Bahcall-Wolf cusp)
     mbh_mass : float, int
         Mass of the MBH [solar mass].
         default: 4.3x10^6 (Milky Way MBH)

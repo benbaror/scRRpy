@@ -30,6 +30,10 @@ class Cusp(object):
     :math:`f(E) \propto |E|^p` corresponding ro a stellar density
     :math:`n(r) \propto r^{-\gamma}` where :math:`\gamma = \tfrac{3}{2} + p`
 
+    TODO - Implement normalization Total mass at :math:`r_{\mathrm{h}}`
+
+    TODO - Implement normalization :math:`N(a)` vs :math:`N(r)`
+
     Parameters
     ----------
     gamma : float, int, optional
@@ -48,16 +52,11 @@ class Cusp(object):
         Keplerian velocity due to the MBH
         :math:`\sigma(r_{\mathrm{h}})^2 = G M_{\bullet} / r_{\mathrm{h}}`.
         default: 2.0
-
-    TODO :
-        Implement normalization Total mass at :math:`r_{\mathrm{h}}`
-    TODO :
-        Implement normalization :math:`N(a)` vs :math:`N(r)`
     """
 
     def __init__(self, gamma=1.75, mbh_mass=4e6,
                  star_mass=1.0, rh=2.0):
-        """
+        r"""
         """
         self.gamma = float(gamma)
         self.mbh_mass = float(mbh_mass)
@@ -74,23 +73,24 @@ class Cusp(object):
 
     @property
     def tg(self):
-        """
+        r"""
         Light crossing time of the MBH [sec]
         """
         return TG0*self.mbh_mass
 
     def jlc(self, a):
         r"""
-        Relativistic loss cone:
-          Minimal normalized angular momentum on which orbits are stable.
+        Relativistic loss cone
 
-          :math:`j_{lc} = J_{lc} / J_c`,
-          where :math:`J_{lc} = 4GM_{\bullet}/c` is the last stable orbit in the
-          parabolic limit and :math:`J_c = \sqrt{GM_{\bullet} a}` is the
-          maximal (circular) stable orbit.
+        Minimal normalized angular momentum on which orbits are stable.
 
-          This is an approximation which works when the orbital binding energy
-          `E` is much smaller than rest energy of the MBH `Mc^2`.
+        :math:`j_{\mathrm{lc}} = J_{\mathrm{lc}} / J_{\mathrm{c}}`,
+        where :math:`J_{\mathrm{lc}} = 4GM_{\bullet}/c` is the last stable orbit in the
+        parabolic limit and :math:`J_{\mathrm{c}} = \sqrt{GM_{\bullet} a}` is the
+        maximal (circular) stable orbit.
+
+        This is an approximation which works when the orbital binding energy
+        :math:`E` is much smaller than rest energy of the MBH :math:`Mc^2`.
 
         Parameters
         ----------
@@ -101,30 +101,30 @@ class Cusp(object):
 
     @property
     def mass_ratio(self):
-        """
+        r"""
         MBH to star mass ratio
         """
         return self.mbh_mass / self.star_mass
 
     @property
     def total_number_of_stars(self):
-        """
-        Number of stars within the radius of influence `rh`
+        r"""
+        Number of stars within the radius of influence :math:`r_{\mathrm{h}}`
         """
         return self.total_stellar_mass / self.star_mass
 
     @property
     def total_stellar_mass(self):
-        """
-        Total mass within the radius of influence `rh` [solar mass]
+        r"""
+        Total mass within the radius of influence :math:`r_\mathrm{h}` [solar mass]
 
-        TODO: Implement normalization
+        TODO - Implement normalization
         """
         return self.mass_ratio
 
     def number_of_stars(self, a):
-        """
-        Number of stars with semi-major axis smaller than a[pc]
+        r"""
+        Number of stars with semi-major axis smaller than :math:`a` [pc]
 
         Parameters
         ----------
@@ -134,9 +134,10 @@ class Cusp(object):
         return self.total_number_of_stars * (a / self.rh) ** (3 - self.gamma)
 
     def stellar_mass(self, a):
-        """
-        Enclosed mass within r = a[pc].
-        TODO: check M(r) vs M(a)
+        r"""
+        Enclosed mass within :math:`r = a` [pc].
+
+        TODO - check :math:`M(r)` vs :math:`M(a)`
 
         Parameters
         ----------
@@ -146,8 +147,8 @@ class Cusp(object):
         return self.total_stellar_mass * (a / self.rh) ** (3 - self.gamma)
 
     def period(self, a):
-        """
-        The orbital period in years at a[pc]
+        r"""
+        The orbital period in years at :math:`a` [pc]
 
         Parameters
         ----------
@@ -157,8 +158,8 @@ class Cusp(object):
         return 2*pi/self.nu_r(a)
 
     def nu_r(self, a):
-        """
-        The orbital frequency in rad/year at a[pc]
+        r"""
+        The orbital frequency in rad/year at :math:`a` [pc]
 
         Parameters
         ----------
@@ -168,7 +169,7 @@ class Cusp(object):
         return (self.rg/a)**1.5/self.tg
 
     def nu_mass(self, a, j):
-        """
+        r"""
         Precession frequency [rad/year] due to stellar mass.
 
         Parameters
@@ -176,12 +177,12 @@ class Cusp(object):
         a: float, array
             Semi-major axis [pc].
         j: float, array
-            Normalized angular momentum :math:`j = J/J_c = \sqrt{1-e^2}`.
+            Normalized angular momentum :math:`j = J/J_{\mathrm{c}} = \sqrt{1-e^2}`.
         """
         return self._nu_mass0(a)*self._g(j)
 
     def nu_gr(self, a, j):
-        """
+        r"""
         Precession frequency [rad/year] due to general relativity
         (first PN term)
 
@@ -190,41 +191,42 @@ class Cusp(object):
         a: float, array
             Semi-major axis [pc].
         j: float, array
-            Normalized angular momentum :math:`j = J/J_c = \sqrt{1-e^2}`.
+            Normalized angular momentum :math:`j = J/J_\mathrm{c} = \sqrt{1-e^2}`.
         """
         return self.gr_factor*self.nu_r(a)*3*(self.rg/a)/j**2
 
     def nu_p(self, a, j):
-        """
-        Precession frequency [rad/year].
-           `nu_p(a, j) = nu_gr(a, j) + nu_mass(a, j)`
+        r"""
+        Precession frequency [rad/year]
+
+        :math:`\nu_{\mathrm{p}} (a, j) = \nu_{\mathrm{gr}} (a, j) + \nu_{\mathrm{mass}} (a, j)`
 
         Parameters
         ----------
         a: float, array
             Semi-major axis [pc].
         j: float, array
-            Normalized angular momentum :math:`j = J/J_c = \sqrt{1-e^2}`.
+            Normalized angular momentum :math:`j = J/J_\mathrm{c} = \sqrt{1-e^2}`.
         """
         return self.nu_gr(a, j) + self.nu_mass(a, j)
 
     def nu_p1(self, a):
-        """
-        Precession frequency at j=1
+        r"""
+        Precession frequency at :math:`j=1`
         """
         return self.nu_gr(a, 1.0) + self._nu_mass0(a)*(3-self.gamma)/2
 
     def d_nu_p(self, a, j):
-        """
-        The derivative of nu_p with respect to j, defined to be positive
+        r"""
+        The derivative of :math:`\nu_\mathrm{p}` with respect to :math:`j`, defined to be positive
         """
         d_nu_gr = 6*self.gr_factor*(self.rg/a)/(j*j*j)
         d_nu_mass = -self.stellar_mass(a) / self.mbh_mass * self._gp(j)
         return (d_nu_gr - d_nu_mass)*self.nu_r(a)
 
     def inverse_cumulative_a(self, x):
-        """
-        The inverse of N(a). Useful to generate a random
+        r"""
+        The inverse of :math:`N(a)`. Useful to generate a random
         sample of semi-major axis.
 
         Parameters
@@ -243,8 +245,8 @@ class Cusp(object):
         return x**(1/(3-self.gamma))*self.rh
 
     def _nu_mass0(self, a):
-        """
-        The frequency of the mass precession divided by g(j).
+        r"""
+        The frequency of the mass precession divided by :math:`g(j)`.
         """
         return -self.nu_r(a) * self.stellar_mass(a) / self.mbh_mass
 
@@ -274,9 +276,9 @@ class Cusp(object):
 
     @property
     def a_gr1(self):
-        """
-        The sma below which nup is only positive,
-        that is nup(a,j=1) = 0
+        r"""
+        The sma below which :math:`\nu_\mathrm{p}` is only positive,
+        that is :math:`\nu_\mathrm{p} (a,j=1) = 0`
         """
         return ((self.gr_factor *
                  6 / (3-self.gamma) * self.mass_ratio /

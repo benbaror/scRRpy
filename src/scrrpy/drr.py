@@ -1,4 +1,4 @@
-"""
+r"""
 A module for calculating Resonant Relaxation diffusion coefficients
 """
 
@@ -30,12 +30,12 @@ Res = namedtuple('Res', ('l', 'n', 'np', 'neval'))
 
 
 class DRR(Cusp):
-    """
+    r"""
     Resonant relaxation diffusion coefficient (DRR).
     Assuming a power law stellar cusp around a massive black hole (MBH).
     The cusp is assumed to have an isotropic distribution function
     :math:`f(E) \propto |E|^p` corresponding ro a stellar density
-    :math:`n(r) \propto r^{-\gamma}` where :math:`\gamma = 3/2 + p`
+    :math:`n(r) \propto r^{-\gamma}` where :math:`\gamma = \tfrac{3}{2} + p`
 
     Parameters
     ----------
@@ -47,7 +47,7 @@ class DRR(Cusp):
         default: 7/4 (Bahcall wolf cusp)
     mbh_mass : float, int, optional
         Mass of the MBH [solar mass].
-        default: 4.3x10^6 (Milky Way MBH)
+        default: :math:`4.3 \times 10^6` (Milky Way MBH)
     star_mass : float, int, optional
         Mass of individual stars [solar mass].
         default: 1.0
@@ -56,7 +56,7 @@ class DRR(Cusp):
         Define as the radius in which the velocity
         dispersion of the stellar cusp :math:`\sigma` is equal to the
         Keplerian velocity due to the MBH
-        :math:`\sigma(r_h)^2 = G M_{\\bullet} / r_h`.
+        :math:`\sigma(r_\mathrm{h})^2 = G M_{\bullet} / r_\mathrm{h}`.
         default: 2.0
     """
 
@@ -92,8 +92,8 @@ class DRR(Cusp):
 
     def __call__(self, l_max, neval=1e3, threads=1,
                  progress_bar=True, seed=None):
-        """
-        Returns the RR diffusion coefficient :math:`D_{JJ}/J_c^2` [1/yr].
+        r"""
+        Returns the RR diffusion coefficient :math:`D_{JJ}/J_{\mathrm{c}}^2` [1/yr].
 
         Parameters
         ----------
@@ -105,7 +105,7 @@ class DRR(Cusp):
             Default: 1000
         threads : int
             Number of parallel threads to use,
-            default is 1 (no palatalization)
+            default is 1 (no parallelization)
         progress_bar : bool
             Show progress bar, default is ``True``
         """
@@ -141,8 +141,8 @@ class DRR(Cusp):
         return drr, drr_err
 
     def _drr_lnnp(self, l, n, n_p, neval=1e3, threads=1):
-        """
-        Calculates the l,n,n_p term of the diffusion coefficient
+        r"""
+        Calculates the :math:`(l,n,n_p)` term of the diffusion coefficient
         """
         neval = int(neval)
 
@@ -252,7 +252,7 @@ class DRR(Cusp):
             pass
 
     def save(self, file_name):
-        """
+        r"""
         Save the current instance to an hdf5 file.
 
         Example
@@ -262,7 +262,6 @@ class DRR(Cusp):
         >>> drr.save('example.hdf5')
         >>> drr = DRR.from_file('example.hdf5')
         >>> d, d_err = drr(l_max=drr.l_max, neval=drr.neval)
-
         """
         with h5py.File(file_name, 'w') as h5:
             drr_lnnp_cache = h5.create_group("_drr_lnnp_cache")
@@ -275,7 +274,7 @@ class DRR(Cusp):
                     pass
 
     def _read(self, file_name):
-        """
+        r"""
         Read the cached data from an hdf5 file
         """
         with h5py.File(file_name, 'r') as h5:
@@ -292,7 +291,8 @@ class DRR(Cusp):
 
     @classmethod
     def from_file(cls, file_name):
-        """Load from file and return an instance
+        r"""
+        Load from file and return an instance
 
         Example
         -------
@@ -319,8 +319,8 @@ def integrate(func, integ, neval=1e4):
 
 @jit(nopython=True)
 def a2_integrand(sma, j, sma_p, j_p, lnnp, true_anomaly):
-    """
-    returns the |alnnp|^2 integrand to use in the MC integration
+    r"""
+    Returns the :math:`|a_{\ell n n^{\prime}}|^{2}` integrand to use in the MC integration
     """
     l, n, n_p = lnnp
     cnnp = np.cos(true_anomaly.T * np.array([n, n, n_p, n_p])).T
@@ -339,8 +339,8 @@ def a2_integrand(sma, j, sma_p, j_p, lnnp, true_anomaly):
 
 @lru_cache()
 def _a2_norm_factor(l, n, n_p):
-    """
-    Normalization factor for |alnnp|^2
+    r"""
+    Normalization factor for :math:`|a_{\ell n n^{prime}} |^{2}`
     """
 
     return (abs(special.sph_harm(n, l, 0, np.pi / 2)) ** 2 *
@@ -349,9 +349,9 @@ def _a2_norm_factor(l, n, n_p):
 
 
 class ResInterp(object):
-    """
-    Generates an interpolation function `jp(ap)` where `jp`
-    satisfies the resonant condition: `nu_p(ap, jp) == omega`
+    r"""
+    Generates an interpolation function :math:`j^{\prime} (a^{\prime})` where :math:`j^{\prime}`
+    satisfies the resonant condition: :math:`\nu^{\prime} (a^{\prime}, j^{\prime}) == \omega`
 
     Parameters
     ----------
@@ -371,11 +371,10 @@ class ResInterp(object):
     >>> jf = np.array([resint(o)(0.1) for o in omega])
     >>> abs(1 - jf/j).max() < 1e-4
     True
-
     """
 
     def __init__(self, cusp, omega, gr_factor=1.0):
-        """
+        r"""
         """
         self._cusp = cusp
         self.size = 1000

@@ -1,4 +1,4 @@
-"""Properties of the stellar cusp"""
+r"""Properties of the stellar cusp"""
 
 import numpy as np
 # noinspection PyUnresolvedReferences
@@ -24,11 +24,11 @@ TG0 = (G*M_sun/c**3).to('year').value
 
 # noinspection PyCompatibility
 class Cusp(object):
-    """
+    r"""
     A power law stellar cusp around a massive black hole (MBH).
     The cusp is assumed to have an isotropic distribution function
     :math:`f(E) \propto |E|^p` corresponding ro a stellar density
-    :math:`n(r) \propto r^{-\gamma}` where :math:`\gamma = 3/2 + p`
+    :math:`n(r) \propto r^{-\gamma}` where :math:`\gamma = \tfrac{3}{2} + p`
 
     Parameters
     ----------
@@ -37,7 +37,7 @@ class Cusp(object):
         default: 7/4 (Bahcall-Wolf cusp)
     mbh_mass : float, int
         Mass of the MBH [solar mass].
-        default: 4.3x10^6 (Milky Way MBH)
+        default: :math:`4.3 \times 10^6` (Milky Way MBH)
     star_mass : float, int
         Mass of individual stars [solar mass].
         default: 1.0
@@ -46,11 +46,13 @@ class Cusp(object):
         Define as the radius in which the velocity
         dispersion of the stellar cusp :math:`\sigma` is equal to the
         Keplerian velocity due to the MBH
-        :math:`\sigma(r_h)^2 = G M_{\\bullet} / r_h`.
+        :math:`\sigma(r_{\mathrm{h}})^2 = G M_{\bullet} / r_{\mathrm{h}}`.
         default: 2.0
 
-    TODO: Implement normalization Total mass at r_H
-    TODO: Implement normalization N(a) vs N(r)
+    TODO :
+        Implement normalization Total mass at :math:`r_{\mathrm{h}}`
+    TODO :
+        Implement normalization :math:`N(a)` vs :math:`N(r)`
     """
 
     def __init__(self, gamma=1.75, mbh_mass=4e6,
@@ -78,13 +80,13 @@ class Cusp(object):
         return TG0*self.mbh_mass
 
     def jlc(self, a):
-        """
+        r"""
         Relativistic loss cone:
           Minimal normalized angular momentum on which orbits are stable.
 
           :math:`j_{lc} = J_{lc} / J_c`,
-          where :math:`J_{lc} = 4GM_{\\bullat}/c` is the last stable orbit in the
-          parabolic limit and :math:`J_c = \sqrt{GM_{\\bullet} a}` is the
+          where :math:`J_{lc} = 4GM_{\bullet}/c` is the last stable orbit in the
+          parabolic limit and :math:`J_c = \sqrt{GM_{\bullet} a}` is the
           maximal (circular) stable orbit.
 
           This is an approximation which works when the orbital binding energy

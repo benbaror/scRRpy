@@ -101,7 +101,7 @@ class DRR(Cusp):
             Maximal order of spherical polynomial to compute
         neval : int
             The maximum number of integrand evaluations
-            in each iteration of the |vegas| algorithm.
+            in each iteration of the `vegas` algorithm.
             Default: 1000
         threads : int
             Number of parallel threads to use,

@@ -222,6 +222,7 @@ class DRR(Cusp):
                                           true_anomaly[:, ix])
             return res
 
+        self.c_lnnp = c_lnnp
         integ = vegas.Integrator(5 * [[0, 1]])
 
         if get_jf is None:
@@ -380,10 +381,19 @@ class ResInterp(object):
         self.size = 1000
         self._cusp.gr_factor = gr_factor
         self.omega = omega
-        self._af = np.logspace(np.log10(self._cusp.rg),
+        self._af = np.logspace(np.log10(16 * self._cusp.rg),
                                np.log10(self._cusp.rh),
-                               1000)
+                               1001)[1:]
         self.x = np.logspace(-5, 0, self.size + 1)[:-1][::-1]
+        self.j_grid = self.make_grid()
+
+    def __call__(self, omega):
+        log_ap, jp = self.j_grid[omega]
+        if jp.size == 0:
+            return
+        return lambda af: np.interp(np.log(af), log_ap, jp, left=0, right=0)
+
+    def make_grid(self):
         j_grid = []
         for af in self._af:
             jlc = self._cusp.jlc(af)
@@ -392,12 +402,5 @@ class ResInterp(object):
             j_grid.append(np.exp(np.interp(self.omega, nup, np.log(j),
                                            left=-np.inf, right=-np.inf)))
         j_grid = np.array(list(zip(*j_grid)))
-        self.j_grid = dict(zip(omega, j_grid))
-
-    def __call__(self, omega):
-        j = self.j_grid[omega]
-        ix = j > 0
-        if sum(ix) >= 1:
-            return lambda af: np.interp(np.log(af), np.log(self._af[ix]),
-                                        j[ix], left=0, right=0)
-        pass
+        return dict((omega, (np.log(self._af[j > 0]), j[j > 0]))
+                    for omega, j in zip(self.omega, j_grid))

@@ -223,8 +223,7 @@ class Cusp(object):
         The derivative of :math:`\nu_\mathrm{p}` with respect to :math:`j`, defined to be positive
         """
         d_nu_gr = 6 * self.gr_factor * (self.rg / a) / (j * j * j)
-        d_nu_mass = self._gp(j)
-        d_nu_mass = - d_nu_mass * self.stellar_mass(a) / self.mbh_mass
+        d_nu_mass = - self.stellar_mass(a) / self.mbh_mass * self._gp(j)
         return (d_nu_gr - d_nu_mass) * self.nu_r(a)
 
     def inverse_cumulative_a(self, x):
@@ -290,6 +289,7 @@ class Cusp(object):
                 self.rh)
 
     def _eval_legendre_inv(self, n, j):
+        # return eval_legendre(n, 1/j)
         try:
             return self._eval_legendre_inv_cache[n](j)
         except (AttributeError, KeyError, TypingError) as err:

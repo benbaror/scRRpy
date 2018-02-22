@@ -2,19 +2,15 @@ r"""
 Properties of the stellar cusp
 """
 
-from functools import partial
-
 import numpy as np
-# noinspection PyUnresolvedReferences
-# noinspection PyUnresolvedReferences
-# noinspection PyUnresolvedReferences
 from astropy.constants import G
 from astropy.constants import M_sun
 from astropy.constants import c
 from numba import jit
-from numba.errors import TypingError
 from numpy import pi
 from scipy.special import eval_legendre
+
+from .utils import interp_reg_loglog
 
 M0 = M_sun
 # Define physical constants
@@ -292,41 +288,13 @@ class Cusp(object):
         # return eval_legendre(n, 1/j)
         try:
             return self._eval_legendre_inv_cache[n](j)
-        except (AttributeError, KeyError, TypingError) as err:
-            if type(err) is TypingError:
-                return self._eval_legendre_inv_cache[n](np.atleast_1d(j))[0]
+        except (AttributeError, KeyError) as err:
             if type(err) is AttributeError:
                 self._eval_legendre_inv_cache = {}
             j_samp = np.logspace(np.log10(self.jlc(self.rh)), 0, 1000)
             pn = eval_legendre(n, 1 / j_samp)
-            x0 = np.log(j_samp[0])
-            dx_inv = 1 / (np.log(j_samp[1]) - x0)
-            self._eval_legendre_inv_cache[n] = partial(interp_loglog, x0=x0,
-                                                       dx_inv=dx_inv,
-                                                       logf=np.log(pn))
+            self._eval_legendre_inv_cache[n] = interp_reg_loglog(j_samp, pn)
         return self._eval_legendre_inv(n, j)
-
-
-@jit(nopython=True)
-def interp_semilogx(x_int, x0, dx_inv, f):
-    f_int = np.empty_like(x_int)
-    for i in range(x_int.size):
-        x_dx = (np.log(x_int[i]) - x0) * dx_inv
-        ind = int(x_dx)
-        w = x_dx - ind
-        f_int[i] = f[ind] * (1 - w) + f[ind + 1] * w
-    return f_int
-
-
-@jit(nopython=True)
-def interp_loglog(x_int, x0, dx_inv, logf):
-    f_int = np.empty_like(x_int)
-    for i, x in enumerate(x_int):
-        x_dx = (np.log(x) - x0) * dx_inv
-        ind = int(x_dx)
-        w = x_dx - ind
-        f_int[i] = logf[ind] * (1 - w) + logf[ind + 1] * w
-    return np.exp(f_int)
 
 
 @jit(nopython=True)

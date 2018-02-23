@@ -98,7 +98,7 @@ class DRR(Cusp):
         Parameters
         ----------
         l_max : int
-            Maximal order of spherical polynomial to compute
+            Maximal order of spherical harmonics to compute
         neval : int
             The maximum number of integrand evaluations
             in each iteration of the `vegas` algorithm.

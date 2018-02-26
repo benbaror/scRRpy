@@ -50,7 +50,7 @@ This package requires:
 
 ::
 
-    pip install scrrpy
+    python setup.py install
 
 Documentation
 =============

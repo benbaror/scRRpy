@@ -61,6 +61,7 @@ class Cusp(object):
         self.star_mass = float(star_mass)
         self.rh = float(rh)
         self.gr_factor = 1.0
+        self.mu = 1.0
 
     @property
     def rg(self):
@@ -118,7 +119,7 @@ class Cusp(object):
 
         TODO - Implement normalization
         """
-        return self.mass_ratio
+        return self.mbh_mass*self.mu
 
     def number_of_stars(self, a):
         r"""

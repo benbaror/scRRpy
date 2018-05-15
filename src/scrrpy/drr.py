@@ -71,7 +71,6 @@ class DRR(Cusp):
         self.gr_factor = 1.0
         self.j = np.logspace(np.log10(self.jlc(self.sma)), 0,
                              j_grid_size + 1)[:-1]
-        self.omega = self.nu_p(self.sma, self.j)
         if seed is None:
             self.seed = np.random.randint(int(1e8))
         else:
@@ -80,6 +79,18 @@ class DRR(Cusp):
         np.random.seed(self.seed)
 
         self.seeds = np.random.randint(int(1e8), size=self.j.size)
+
+    @property
+    def omega(self):
+        try:
+            return self._omega
+        except AttributeError:
+            self._omega = self.nu_p(self.sma, self.j)
+            return self._omega
+
+    @omega.setter
+    def omega(self, omega):
+        self._omega = omega
 
     @lru_cache()
     def _res_intrp(self, ratio):

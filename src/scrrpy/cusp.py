@@ -250,7 +250,7 @@ class Cusp(object):
         return -self.nu_r(a) * self.stellar_mass(a) / self.mbh_mass
 
     def _g(self, j):
-        """
+        r"""
         g(j) = -j^(6-2\gamma)/pi/sqrt(1-j^2)*\int_0^\pi cos(s) /
                (1+sqrt(1+j^2)^(3-\gamma)
         For \gamma = 2:

@@ -40,7 +40,7 @@ PYTHON VERSIONS AND DEPENDENCIES
 ``scRRpy`` supports both Python 3.5, and 3.6
 
 This package requires:
- * `Numpy <http://numpy.scipy.org/>`__
+ * `Numpy <http://www.numpy.org/>`__
  * `Scipy <http://www.scipy.org/>`__
  * `Matplotlib <https://matplotlib.org/>`__
  * `astropy <http://www.astropy.org/>`__
